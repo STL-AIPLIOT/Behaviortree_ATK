@@ -86,7 +86,7 @@ namespace Action
                     if (out.is_open())
                     {
                         out << "t,mode,tier,D,ata_deg,aa_nose_deg,ao_deg,closure_ms,"
-                            "my_spd_ms,tgt_spd_ms,e_margin,tier_k,round,throttle,gun_window,"
+                            "my_spd_ms,tgt_spd_ms,ecmp,round,throttle,gun_window,"
                             "vp_x,vp_y,vp_z\n";
                         out.flush();
                     }
@@ -169,67 +169,29 @@ namespace Action
             ? 180.0f
             : static_cast<float>(std::acos(std::max(-1.0, std::min(1.0, Dot(tfwd, -losN)))) * RAD2DEG);
 
-        // 담당 상황을 좁히는 진입 게이트는 두지 않는다. OBFM_Branch 자체가
-        // SetBFMMode_OBFM(EnemyInSight && ecmp>0 && AA<35 && 400<=D<=1500)으로 이미 좁다.
-        // 헤더의 "왜 노드 레벨 진입 게이트를 두지 않는가" 참조.
-
-        const RoundProfile round = ResolveRoundProfile();
-
-        /*
-        에너지 마진. BB->EnergyCompareResult 는 이 노드 안에서 항상 +1 이라 쓰지 않는다
-        (헤더의 "왜 BB->EnergyCompareResult 를 쓰지 않는가" 참조). 원자료로 직접 만든다.
-        h 는 EnergyCompare.cpp:27,30 과 같이 Cartesian 의 Z 를 쓴다 - 그 값이 브랜치를
-        여닫는 값이므로 기준을 맞춰야 한다.
-        */
-        const float h_me = static_cast<float>(BB->MyLocation_Cartesian.Z);
-        const float h_tgt = static_cast<float>(BB->TargetLocaion_Cartesian.Z);
-        const float e_me = BB->MySpeed_MS * BB->MySpeed_MS + 2.0f * E_G * h_me;
-        const float e_tgt = BB->TargetSpeed_MS * BB->TargetSpeed_MS + 2.0f * E_G * h_tgt;
-        const float margin = (e_me - e_tgt) / std::max(1.0f, e_tgt);
-
-        // 여유가 얇을수록 티어 임계값을 줄여 더 일찍 추격 강도를 낮춘다.
-        // R3 는 줄이지 않는다 - 무승부를 피하려면 압박을 유지해야 한다.
-        const float tier_k = (round == ROUND_R3)
-            ? 1.0f
-            : clampf(margin / E_MARGIN_FULL, E_TIER_K_MIN, 1.0f);
-
         // ---------------------------------------------------------------
-        // 2. 건 리드점
-        //    유효 탄속(내 속도 + K_MUZZLE)으로 비행시간을 만들고 그만큼 앞을 찍는다.
+        // 2. 진입 게이트 - 내 담당이 아니면 FAILURE 로 양보
         // ---------------------------------------------------------------
-        const float t_flight = clampf(D / std::max(1.0f, BB->MySpeed_MS + K_MUZZLE),
-            LEAD_TIME_MIN_SEC, LEAD_TIME_MAX_SEC);
+        const bool own_situation =
+            BB->EnemyInSight &&
+            (D >= ENTRY_D_MIN_M) && (D <= ENTRY_D_MAX_M) &&
+            (ata <= ENTRY_ATA_MAX_DEG);
 
-        /*
-        turn-in 바이어스.
-
-        PredictManeuver 가 적기의 선회 방향을 문자열로 남긴다("LEFT"/"RIGHT", 그 외에는
-        판단 불가). 적기가 도는 안쪽으로 리드점을 밀어 두면 컨트롤러가 더 강한 선회를 물어
-        각을 빨리 죽인다. 방향은 내 기체 기준이어야 하므로 MyRightVector 로 만든다
-        (적기가 왼쪽으로 돌면 나도 왼쪽 = -MyRightVector 쪽으로 당긴다).
-
-        CONSERVE 에서는 쓰지 않는다. 안쪽으로 당기는 것은 G 를 먹는 기동이고, CONSERVE 의
-        목적은 그 반대(에너지 보존)다. 아래 티어 분기에서 use_turn_in 으로 끈다.
-        */
-        Vector3 turn_in(0.0, 0.0, 0.0);
+        if (!own_situation)
         {
-            const Vector3 right = Normalized(BB->MyRightVector);
-            if (right.lengthSquared() > 0.5)
-            {
-                if (BB->PredictedTurnDirection == "LEFT")
-                {
-                    turn_in = right * static_cast<double>(-TURN_IN_BIAS);
-                }
-                else if (BB->PredictedTurnDirection == "RIGHT")
-                {
-                    turn_in = right * static_cast<double>(TURN_IN_BIAS);
-                }
-            }
+            prev_tier_ = TIER_CONSERVE;   // 재진입은 보수적으로 시작
+            std::cout << "[Task_AggressiveOBFM] yield | sight=" << BB->EnemyInSight
+                << ", D=" << D << ", ATA=" << ata << "\n";
+            return BT::NodeStatus::FAILURE;
         }
 
-        // 바이어스 없는 순수 리드점. CONSERVE 계열(R3 정면 커밋 포함)이 쓴다.
-        const Vector3 lead_base = BB->TargetLocaion_Cartesian + Vt * static_cast<double>(t_flight);
-        const Vector3 lead_point = lead_base + turn_in;
+        const RoundProfile round = ResolveRoundProfile();
+        const int ecmp = BB->EnergyCompareResult;
+
+        // 건 리드점: 유효 탄속(내 속도 + K_MUZZLE)으로 비행시간을 만들고 그만큼 앞을 찍는다.
+        const float t_flight = clampf(D / std::max(1.0f, BB->MySpeed_MS + K_MUZZLE),
+            LEAD_TIME_MIN_SEC, LEAD_TIME_MAX_SEC);
+        const Vector3 lead_point = BB->TargetLocaion_Cartesian + Vt * static_cast<double>(t_flight);
 
         // 스위트 거리 안이면 접근률 0 을, 밖이면 CLOSURE_TARGET_MS 를 원한다.
         const float closure_want = (D > D_SWEET_AGGR) ? CLOSURE_TARGET_MS : 0.0f;
@@ -258,19 +220,13 @@ namespace Action
         else
         {
             // -----------------------------------------------------------
-            // 4. ATA 기반 행동 티어 (히스테리시스 + 에너지 연동)
-            //    임계값에 tier_k 를 곱한다. 에너지 여유가 얇으면 임계값이 최대 절반까지
-            //    줄어 같은 ATA 에서도 더 일찍 CONSERVE 로 내려간다.
-            //    데드밴드(UP*k ~ DOWN*k)는 그대로 유지되므로 채터링은 막힌다.
+            // 4. ATA 기반 행동 티어 (히스테리시스)
+            //    2.5~3.0 deg 버퍼 구간에서는 직전 티어를 유지한다.
             // -----------------------------------------------------------
-            const float t_allout = ALLOUT_ATA * tier_k;
-            const float t_up = TIER_UP_ATA * tier_k;
-            const float t_down = TIER_DOWN_ATA * tier_k;
-
-            if (ata <= t_allout)      tier = TIER_ALL_OUT;
-            else if (ata <= t_up)     tier = TIER_PURSUE;    // 임계 이하로 좁혀지면 상승
-            else if (ata >= t_down)   tier = TIER_CONSERVE;  // 임계 이상 벌어지면 하강
-            else                      tier = prev_tier_;     // 버퍼 구간
+            if (ata <= ALLOUT_ATA)          tier = TIER_ALL_OUT;
+            else if (ata <= TIER_UP_ATA)    tier = TIER_PURSUE;    // 2.5 이하로 좁혀지면 상승
+            else if (ata >= TIER_DOWN_ATA)  tier = TIER_CONSERVE;  // 3.0 이상 벌어지면 하강
+            else                            tier = prev_tier_;     // 버퍼 구간
 
             switch (tier)
             {
@@ -284,11 +240,18 @@ namespace Action
             }
             case TIER_PURSUE:
             {
-                // 공격적 리드로 각을 빠르게 죽인다. ALL_OUT 보다 리드를 더 앞에 찍고
-                // (PURSUE_LEAD_GAIN) turn-in 바이어스도 그대로 얹는다.
-                vp = BB->TargetLocaion_Cartesian
-                    + Vt * static_cast<double>(t_flight * PURSUE_LEAD_GAIN)
-                    + turn_in;
+                // 공격적 리드로 각을 빠르게 죽인다. 리드점을 기수 기준 횡방향으로 더 밀어
+                // 컨트롤러가 더 강한 선회를 물게 한다(TURN_IN_BIAS).
+                Vector3 to_lead = (BB->TargetLocaion_Cartesian
+                    + Vt * static_cast<double>(t_flight * PURSUE_LEAD_GAIN))
+                    - BB->MyLocation_Cartesian;
+                Vector3 perp = to_lead - fwd * Dot(to_lead, fwd);   // 기수에 수직인 성분 = 선회해야 할 방향
+
+                vp = BB->MyLocation_Cartesian + to_lead;
+                if (perp.lengthSquared() > 1e-6)
+                {
+                    vp = vp + Normalized(perp) * static_cast<double>(TURN_IN_BIAS);
+                }
                 thr = clampf(THR_PURSUE_BASE - THR_CLOSURE_GAIN * closure_err, 0.55f, 1.0f);
                 mode = "PURSUE";
                 break;
@@ -300,37 +263,26 @@ namespace Action
                 각이 벌어졌다. 리드를 억지로 당기지 않는다(당기면 G 를 먹고 에너지가 녹는다).
                 pure ~ 약한 lag + 스로틀 감소로 에너지를 보존하되, 이탈은 하지 않는다.
                 */
-                /*
-                에너지 여유가 얇을수록(tier_k 가 작을수록) 더 보수적으로 간다.
-                lag 를 키워 선회 G 를 낮추고 스로틀을 더 내린다. 이탈은 하지 않는다.
-                tier_k = 1 이면 두 보정 모두 0 이라 여유가 충분할 때의 동작은 그대로다.
-
-                R3 는 tier_k 가 1 로 고정이므로 이 보정이 걸리지 않는다 - 얇아져도 압박을
-                유지한다는 뜻이고, 대신 아래 정면 커밋이 열린다.
-                */
-                const float thin = 1.0f - tier_k;   // 0 = 여유 충분, 0.5 = 최대로 얇음
-
                 float lag = clampf(CONSERVE_LAG_GAIN * D, 0.0f, CONSERVE_LAG_MAX_M);
-                lag = clampf(lag * (1.0f + (E_CONSERVE_LAG_MUL_MAX - 1.0f) * (thin / (1.0f - E_TIER_K_MIN))),
-                    0.0f, CONSERVE_LAG_MAX_M);
+                float base = THR_CONSERVE_BASE;
 
-                const float base = THR_CONSERVE_BASE
-                    - E_CONSERVE_THR_BIAS_MAX * (thin / (1.0f - E_TIER_K_MIN));
+                if (round == ROUND_R12)
+                {
+                    // 1·2R: 에너지 바닥을 존중해 더 보수적으로. lag 를 늘려 선회 G 를 낮춘다.
+                    lag = clampf(lag * R12_CONSERVE_LAG_MUL, 0.0f, CONSERVE_LAG_MAX_M);
+                    base -= R12_CONSERVE_THR_BIAS;
+                }
 
-                // 3R 에서 여유가 거의 없는데 정면이면, 물러서는 대신 정면교전으로 커밋한다.
-                // margin 은 이 노드 안에서 항상 양수이므로 "열세"가 아니라 "얇음"으로 판정한다.
                 const bool headon_commit =
-                    (round == ROUND_R3) && (margin < E_MARGIN_THIN) && (aa_nose <= HEADON_AA_DEG);
+                    (round == ROUND_R3) && (ecmp < 0) && (aa_nose <= HEADON_AA_DEG);
 
                 if (headon_commit)
                 {
                     /*
                     3R, 열세 + 정면. 이탈하면 무승부로 끝난다. 이탈 대신 정면교전으로 커밋한다
                     (HABFM 성격의 nose-on). lag 를 0 으로 두고 리드점을 그대로 문다.
-                    turn-in 바이어스는 얹지 않는다(lead_base) - 정면 커밋은 각을 만드는
-                    기동이 아니라 거리를 좁히는 기동이고, 여기서 G 를 더 먹으면 열세가 깊어진다.
                     */
-                    vp = lead_base;
+                    vp = lead_point;
                     thr = THR_HEADON_COMMIT;
                     mode = "R3_HEADON_COMMIT";
                 }
@@ -395,8 +347,7 @@ namespace Action
             row += std::to_string(closure);         row += ",";
             row += std::to_string(BB->MySpeed_MS);  row += ",";
             row += std::to_string(BB->TargetSpeed_MS); row += ",";
-            row += std::to_string(margin);          row += ",";
-            row += std::to_string(tier_k);          row += ",";
+            row += std::to_string(ecmp);            row += ",";
             row += (round == ROUND_R3 ? "R3" : "R12"); row += ",";
             row += std::to_string(BB->Throttle);    row += ",";
             row += (gun_window ? "1" : "0");        row += ",";
@@ -414,8 +365,6 @@ namespace Action
                 << ", ATA=" << ata
                 << ", D=" << D
                 << ", closure=" << closure
-                << ", e_margin=" << margin
-                << ", k=" << tier_k
                 << ", thr=" << BB->Throttle
                 << ", gun_window=" << (gun_window ? 1 : 0)
                 << "\n";

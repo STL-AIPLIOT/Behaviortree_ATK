@@ -20,22 +20,17 @@ namespace Action
     출력 계약
     ---------
     BB->VP_Cartesian 과 BB->Throttle(0~1) 만 쓴다. 다른 BB 필드는 읽기 전용이다.
+    내 담당 상황이 아니면 반드시 FAILURE 를 반환해 Fallback 의 다음 자식
+    (Task_AntiOvershoot / Task_CornerLeadPursuit / Task_LeadPursuit / Task_FollowTarget)
+    으로 넘긴다.
 
-    FAILURE 는 **퇴화 기하일 때만** 낸다 (BB nullptr / D 가 0 에 가까움 / 기수 벡터 미갱신).
-    그 외에는 항상 SUCCESS 다.
-
-    왜 노드 레벨 진입 게이트를 두지 않는가
-    --------------------------------------
-    브랜치 게이트가 이미 좁다. OBFM_Branch 는 SetBFMMode_OBFM 이 SUCCESS 일 때만 열리고,
-    그 조건은 EnemyInSight && EnergyCompareResult > 0 && MyAspectAngle_Degree < 35 &&
-    400 <= D <= 1500 이다 (SetBFMMode_OBFM.cpp:23-26). 즉 이 노드가 tick 되는 시점에
-    상황은 이미 "시야 안 · 에너지 우세 · 적기 전방 섹터 · 중거리"로 제한돼 있고,
-    노드가 다시 시야/거리/ATA 를 검사하는 것은 중복이다.
-
-    대가는 분명하다. 이 노드가 OBFM_Action Fallback 의 첫 자식이므로, 퇴화 기하가 아닌 한
-    뒤의 Task_CornerLeadPursuit / Task_LeadPursuit / Task_FollowTarget 은 실행되지 않는다.
-    그것들은 통상 경로가 아니라 안전망으로 남기는 것이다 - 이 노드가 판단 근거를 잃었을 때
-    (방향 벡터 미갱신 등) 트리가 무행동이 되지 않게 받아 주는 역할만 한다.
+    왜 진입 게이트(ENTRY_*)가 필요한가
+    ----------------------------------
+    행동 티어의 CONSERVE 는 |ATA| >= 3.0 deg 전부, 즉 3~180 deg 를 덮는다.
+    이 노드는 OBFM_Action Fallback 의 첫 자식이므로, 게이트가 없으면 항상 SUCCESS 가 되어
+    뒤의 자식들이 한 번도 실행되지 않는다(Task_AntiOvershoot 이 예전에 겪은 것과 같은 형태의
+    starvation 이다 - Task_AntiOvershoot.cpp:22-30 주석 참조). 그래서 시야/거리/ATA 로
+    "내가 맡을 상황"을 좁히고, 밖이면 양보한다.
 
     각도 규약 주의
     --------------
@@ -78,11 +73,8 @@ namespace Action
         */
         enum RoundProfile
         {
-            // 1R, 2R: 에너지 여유가 얇아지면 티어 임계값을 줄여 일찍 추격 강도를 낮춘다.
-            ROUND_R12,
-            // 3R: 얇아져도 임계값을 줄이지 않는다(k=1 고정). 무승부는 지는 것과 같으므로
-            //     계속 압박하고, 여유가 아주 얇은데 정면이면 정면교전으로 커밋한다.
-            ROUND_R3
+            ROUND_R12,   // 1R, 2R: 에너지 바닥 존중. CONSERVE 를 약간 더 보수적으로
+            ROUND_R3     // 3R   : 열세 + 정면이면 이탈 대신 정면교전으로 커밋(무승부를 정면으로 깬다)
         };
         static constexpr RoundProfile ROUND_PROFILE = ROUND_R12;
 
@@ -95,62 +87,25 @@ namespace Action
         static constexpr float OVERSHOOT_D = 350.0f;   // 하이 요요 발동 거리 [m]
         static constexpr float H_YOYO = 180.0f;   // 하이 요요 수직 오프셋 [m]
         static constexpr float K_MUZZLE = 300.0f;   // lead 비행시간 계산용 유효 탄속 가산 [m/s]
-        // 적기 선회 안쪽으로 리드점을 미는 횡방향 바이어스 [m].
-        // 방향은 BB->PredictedTurnDirection("LEFT"/"RIGHT")을 MyRightVector 에 투영해 정한다.
-        // CONSERVE 에서는 쓰지 않는다 - 안쪽으로 당기는 것은 G 를 먹는 기동이라 보존과 반대다.
-        static constexpr float TURN_IN_BIAS = 180.0f;
+        static constexpr float TURN_IN_BIAS = 180.0f;   // PURSUE 에서 리드점을 더 당기는 횡방향 바이어스 [m]
         static constexpr float ALLOUT_ATA = 1.5f;     // ALL_OUT 진입 ATA [deg]
         static constexpr float TIER_UP_ATA = 2.5f;     // 티어 상승 임계 [deg]
         static constexpr float TIER_DOWN_ATA = 3.0f;     // 티어 하강 임계 [deg]
 
-        // ================= 파생 튜닝 상수 =================
-        /*
-        리드 비행시간의 상하한 [sec].
-        t_lead = clamp(D / (MySpeed_MS + K_MUZZLE), MIN, MAX) 로 쓴다.
+        // ================= 진입 게이트 =================
+        // 이 밖이면 FAILURE 로 양보한다. 위의 "왜 진입 게이트가 필요한가" 참조.
+        static constexpr float ENTRY_ATA_MAX_DEG = 60.0f;
+        static constexpr float ENTRY_D_MIN_M = 30.0f;
+        static constexpr float ENTRY_D_MAX_M = 2500.0f;
 
-        상한 0.6 초가 핵심이다. D=1500 m / (250+300) m/s = 2.7 초까지 벌어질 수 있는데,
-        그만큼 앞을 찍으면 리드점이 적기의 현재 선회 반경 밖으로 나가 버려 조준이 아니라
-        엉뚱한 공간을 향하는 기동이 된다. 총알 비행시간에 해당하는 구간만 남긴다.
-        */
-        static constexpr float LEAD_TIME_MIN_SEC = 0.05f;
-        static constexpr float LEAD_TIME_MAX_SEC = 0.6f;
+        // ================= 파생 튜닝 상수 =================
+        static constexpr float LEAD_TIME_MIN_SEC = 0.2f;
+        static constexpr float LEAD_TIME_MAX_SEC = 2.0f;
         static constexpr float PURSUE_LEAD_GAIN = 1.3f;     // PURSUE 는 리드를 조금 더 앞에 찍는다
         static constexpr float CONSERVE_LAG_GAIN = 0.15f;    // 약한 lag = 거리의 15%
         static constexpr float CONSERVE_LAG_MAX_M = 250.0f;   // lag 상한. 이 이상은 사실상 extend 다
+        static constexpr float R12_CONSERVE_LAG_MUL = 1.2f;     // R12: lag 를 더 줘 선회 G 를 낮춘다
         static constexpr float HEADON_AA_DEG = 60.0f;    // R3 정면 커밋 판정 (적기 기수 기준)
-
-        // ================= 에너지 =================
-        /*
-        왜 BB->EnergyCompareResult 를 쓰지 않는가
-        ----------------------------------------
-        그 값은 이 노드 안에서 **항상 +1 이라 정보량이 0 이다.** OBFM_Branch 는 Sequence 라
-        SetBFMMode_OBFM 이 SUCCESS 일 때만 OBFM_Action 이 tick 되는데, 그 조건에
-        EnergyCompareResult > 0 이 들어 있다(SetBFMMode_OBFM.cpp:19,26). 매 tick 재평가되므로
-        이 노드가 도는 동안 에너지 열세는 발생할 수 없다.
-        ecmp < 0 을 보는 코드는 전부 도달 불가능한 죽은 분기다.
-
-        그래서 의미 있는 신호는 "우세냐 열세냐"가 아니라 **우세가 얼마나 얇으냐**다.
-        ATA 를 BB 대신 직접 계산한 것과 같은 이유로, 삼치 요약 대신 원자료에서 연속량을 만든다.
-
-            E      = V^2 + 2*g*h          (EnergyCompare.cpp:32-33 과 같은 식)
-            margin = (E_me - E_tgt) / E_tgt
-
-        margin 은 이 노드 안에서 항상 양수지만 0 에 가까울 수 있다. 그 얇기를 k 로 바꿔
-        티어 임계값과 CONSERVE 강도에 함께 물린다.
-
-            k = clamp(margin / E_MARGIN_FULL, E_TIER_K_MIN, 1.0)
-
-        k=1 (여유 충분) 이면 임계값은 지정값 1.5/2.5/3.0 그대로다. margin 이 얇아질수록
-        임계값이 최대 절반까지 줄어 같은 ATA 에서도 더 일찍 CONSERVE 로 내려간다 -
-        대원칙의 "각이 벌어지면 추격 강도를 낮춰 in-fight 로 보존한다"를 에너지에 연동한 것이다.
-        이탈은 여전히 하지 않는다(ALLOW_EXTEND = false).
-        */
-        static constexpr float E_G = 9.81f;    // EnergyCompare.cpp 와 같은 값
-        static constexpr float E_MARGIN_FULL = 0.20f;   // 이 이상이면 감쇠 없음(k=1)
-        static constexpr float E_TIER_K_MIN = 0.5f;    // 임계값 축소 하한
-        static constexpr float E_MARGIN_THIN = 0.05f;   // R3 정면 커밋 판정 기준
-        static constexpr float E_CONSERVE_LAG_MUL_MAX = 1.5f;    // k 최저일 때 lag 배수
-        static constexpr float E_CONSERVE_THR_BIAS_MAX = 0.10f;   // k 최저일 때 스로틀 추가 감소
 
         // 스로틀
         static constexpr float THR_ALLOUT_BASE = 0.95f;
@@ -160,6 +115,7 @@ namespace Action
         static constexpr float THR_HEADON_COMMIT = 0.90f;
         static constexpr float THR_CLOSURE_GAIN = 0.02f;    // 접근률 초과분 1 m/s 당 스로틀 감소
         static constexpr float THR_ALLOUT_GAIN = 0.01f;    // ALL_OUT 은 절반만 반응(각을 놓치지 않는다)
+        static constexpr float R12_CONSERVE_THR_BIAS = 0.05f;    // R12: CONSERVE 를 더 보수적으로
         static constexpr float CLOSURE_TARGET_MS = 10.0f;    // 스위트 거리 밖에서 허용하는 접근률
 
         // ================= WEZ (로깅 전용, 절대 넓히지 않는다) =================

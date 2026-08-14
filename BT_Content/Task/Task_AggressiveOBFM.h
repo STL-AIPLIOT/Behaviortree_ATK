@@ -86,6 +86,9 @@ namespace Action
         static constexpr float OVERSHOOT_CLOSURE = 18.0f;    // 하이 요요 발동 접근률 [m/s]
         static constexpr float OVERSHOOT_D = 350.0f;   // 하이 요요 발동 거리 [m]
         static constexpr float H_YOYO = 180.0f;   // 하이 요요 수직 오프셋 [m]
+        // [회전3] 요요 오프셋이 가져야 할 최소 월드 상방 성분(단위벡터 Z). 약 20도.
+        // 나이프에지(동체 up 이 수평)에서 수직 성분이 0 이 되는 것을 막는다.
+        static constexpr double YOYO_MIN_UP_Z = 0.35;
         static constexpr float K_MUZZLE = 300.0f;   // lead 비행시간 계산용 유효 탄속 가산 [m/s]
         static constexpr float TURN_IN_BIAS = 180.0f;   // PURSUE 에서 리드점을 더 당기는 횡방향 바이어스 [m]
         static constexpr float ALLOUT_ATA = 1.5f;     // ALL_OUT 진입 ATA [deg]

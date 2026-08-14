@@ -211,7 +211,19 @@ namespace Action
 
         if (overshoot_risk)
         {
-            const Vector3 up = Normalized(BB->MyUpVector);
+            // [회전3] 요요 오프셋은 반드시 월드 상반구를 향해야 한다.
+            // MyUpVector 는 쿼터니언에서 뽑은 *동체* up 이라(DirectionVectorUpdate.cpp:32-34)
+            // 인버티드/고뱅크에서 Z<0 이 된다. 월드 +Z 가 상방이므로
+            // (Task_ClimbToSafeAltitude.cpp:62-74) 그대로 쓰면 VP 가 타깃 아래에 찍혀
+            // 컨트롤러가 지면으로 몬다. 회전 1.5 에서 요요가 처음 발화하자
+            // 20판 전부가 "altitude below min" 으로 끝났다.
+            Vector3 up = Normalized(BB->MyUpVector);
+            if (up.Z < 0.0) up = -up;                  // 하반구를 향하면 뒤집는다
+            if (up.Z < YOYO_MIN_UP_Z)                  // 나이프에지에서 수직 성분 소멸 방지
+            {
+                up.Z = YOYO_MIN_UP_Z;
+                up = Normalized(up);                   // MyUpVector 가 0 이어도 (0,0,1) 로 수렴한다
+            }
             vp = BB->TargetLocaion_Cartesian + up * static_cast<double>(H_YOYO);
             thr = clampf(THR_YOYO_BASE - THR_CLOSURE_GAIN * (closure - OVERSHOOT_CLOSURE), 0.25f, 0.60f);
             mode = "HIGH_YOYO";

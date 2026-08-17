@@ -1,4 +1,5 @@
 #include "SetBFMMode_SCISSORS.h"
+#include "../BTLog.h"
 #include <iostream>
 #include <algorithm>
 
@@ -25,10 +26,10 @@ BT::NodeStatus SetBFMMode_SCISSORS::tick()
 
     if (cond) {
         BB->BFM = SCISSORS;
-        std::cout << "[SetBFMMode_SCISSORS] t=" << BB->RunningTime << "s | Enter SCISSORS | D=" << D << ", LOS=" << los << ", E=" << ecmp << "\n";
+        BT_VLOG("[SetBFMMode_SCISSORS] t=" << BB->RunningTime << "s | Enter SCISSORS | D=" << D << ", LOS=" << los << ", E=" << ecmp << "\n");
         return BT::NodeStatus::SUCCESS;
     }
 
-    std::cout << "[SetBFMMode_SCISSORS] t=" << BB->RunningTime << "s | Blocked | sight=" << sight << ", LOS=" << los << ", D=" << D << ", E=" << ecmp << "\n";
+    BT_VLOG("[SetBFMMode_SCISSORS] t=" << BB->RunningTime << "s | Blocked | sight=" << sight << ", LOS=" << los << ", D=" << D << ", E=" << ecmp << "\n");
     return BT::NodeStatus::FAILURE;
 }

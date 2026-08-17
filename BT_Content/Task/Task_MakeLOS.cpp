@@ -1,4 +1,5 @@
 #include "Task_MakeLOS.h"
+#include "../BTLog.h"
 #include <cmath>
 #include <algorithm> // std::clamp
 #include <iostream>  //  콘솔 로그
@@ -24,13 +25,13 @@ PortsList Action::Task_MakeLOS::providedPorts() {
 NodeStatus Action::Task_MakeLOS::tick() {
     Optional<CPPBlackBoard*> BB = getInput<CPPBlackBoard*>("BB");
     if (!BB) {
-        std::cout << "[MakeLOS] 조건 미충족 → FAILURE (BB 입력 실패)" << std::endl;
+        BT_VLOG("[MakeLOS] 조건 미충족 → FAILURE (BB 입력 실패)" << std::endl);
         return NodeStatus::FAILURE;
     }
     CPPBlackBoard* bb = *BB;
 
     if (!bb || bb->Enemy.empty()) {
-        std::cout << "[MakeLOS] 조건 미충족 → FAILURE (적기 없음)" << std::endl;
+        BT_VLOG("[MakeLOS] 조건 미충족 → FAILURE (적기 없음)" << std::endl);
         return NodeStatus::FAILURE;
     }
 
@@ -43,11 +44,11 @@ NodeStatus Action::Task_MakeLOS::tick() {
     const float dz = targetPos.Z - myPos.Z;
     const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-    std::cout << "[MakeLOS] Distance=" << distance << std::endl;
+    BT_VLOG("[MakeLOS] Distance=" << distance << std::endl);
 
 
     if (distance <= 1e-4f) {
-        std::cout << "[MakeLOS] 조건 미충족 → FAILURE (거리=0)" << std::endl;
+        BT_VLOG("[MakeLOS] 조건 미충족 → FAILURE (거리=0)" << std::endl);
         return NodeStatus::FAILURE;
     }
 
@@ -70,7 +71,7 @@ NodeStatus Action::Task_MakeLOS::tick() {
     dot = (dot < -1.0f) ? -1.0f : (dot > 1.0f ? 1.0f : dot);
     float angleDeg = std::acos(dot) * RAD2DEG;
 
-    std::cout << "[MakeLOS] angleDeg=" << angleDeg << std::endl;
+    BT_VLOG("[MakeLOS] angleDeg=" << angleDeg << std::endl);
 
     // === 핵심 정책 ===
     // MakeLOS는 "순수 정렬"만 수행: 항상 타깃 그 자체를 바라보게 함.
@@ -116,7 +117,7 @@ NodeStatus Action::Task_MakeLOS::tick() {
     // 속도 관리는 상위 노드에서 하도록 권장. 필요 시 유지/조정
     bb->Throttle = 1.0f;
 
-    std::cout << "[MakeLOS] LOS 정렬 실행!" << std::endl;
+    BT_VLOG("[MakeLOS] LOS 정렬 실행!" << std::endl);
 
 #ifdef MAKELOS_DEBUG
     // 원하는 로거로 바꿔서 사용 (예: spdlog, UE_LOG, etc.)

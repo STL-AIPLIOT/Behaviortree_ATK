@@ -1,4 +1,5 @@
 #include "Task_LeadEntry.h"
+#include "../BTLog.h"
 
 using namespace BT_Geometry;
 
@@ -23,8 +24,8 @@ namespace Action
         {
             // ���� ������ �� �������� �ѱ�
             // (�ð� Ÿ�̸Ӵ� �Ʒ����� �ʱ�ȭ)
-            std::cout << "[Lead] skip: D=" << D << " (allow "
-                << LEAD_D_MIN << "~" << LEAD_D_MAX << "), AA=" << AA << " deg\n";
+            BT_VLOG("[Lead] skip: D=" << D << " (allow "
+                << LEAD_D_MIN << "~" << LEAD_D_MAX << "), AA=" << AA << " deg\n");
             // ���� Ÿ�̸� ����
             lead_timer_ = 0.0f;
             return BT::NodeStatus::FAILURE;
@@ -37,7 +38,7 @@ namespace Action
         lead_timer_ += dt;
         if (lead_timer_ > LEAD_TIME_MAX)
         {
-            std::cout << "[Lead] stop: time_limit " << lead_timer_ << "s > " << LEAD_TIME_MAX << "s\n";
+            BT_VLOG("[Lead] stop: time_limit " << lead_timer_ << "s > " << LEAD_TIME_MAX << "s\n");
             lead_timer_ = 0.0f;
             return BT::NodeStatus::FAILURE;
         }
@@ -55,7 +56,7 @@ namespace Action
             Vector3 Ht = BB->TargetForwardVector;
             if (!normalize(Ht))
             {
-                std::cout << "[Lead] skip: invalid target forward\n";
+                BT_VLOG("[Lead] skip: invalid target forward\n");
                 lead_timer_ = 0.0f;
                 return BT::NodeStatus::FAILURE;
             }
@@ -63,7 +64,7 @@ namespace Action
             vt_len = static_cast<float>(Vt.length());
             if (vt_len < 0.1f)
             {
-                std::cout << "[Lead] skip: target too slow\n";
+                BT_VLOG("[Lead] skip: target too slow\n");
                 lead_timer_ = 0.0f;
                 return BT::NodeStatus::FAILURE;
             }
@@ -103,13 +104,13 @@ namespace Action
 
         // --- ��� & ���� ---
         BB->VP_Cartesian = VP;
-        std::cout << "[Lead] OK  D=" << D
+        BT_VLOG("[Lead] OK  D=" << D
             << " Vm=" << BB->MySpeed_MS
             << " |Vt|=" << vt_len
             << " t_lead=" << t_lead
             << " AA=" << AA
             << " AO=" << BB->MyAngleOff_Degree
-            << " t_used=" << lead_timer_ << "s\n";
+            << " t_used=" << lead_timer_ << "s\n");
 
         return BT::NodeStatus::SUCCESS;
     }

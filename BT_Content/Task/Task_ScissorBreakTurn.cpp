@@ -1,4 +1,5 @@
 #include "Task_ScissorBreakTurn.h"
+#include "../BTLog.h"
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -29,7 +30,7 @@ BT::NodeStatus Task_ScissorBreakTurn::tick()
     Vector3 offset = (dir == 0 ? BB->MyRightVector : -BB->MyRightVector) * side;
     BB->VP_Cartesian = BB->MyLocation_Cartesian + offset;
 
-    std::cout << "[Task_ScissorBreakTurn] 방향전환 "
-        << (dir == 0 ? "Right" : "Left") << " | D=" << D << ", side=" << side << "\n";
+    BT_VLOG("[Task_ScissorBreakTurn] 방향전환 "
+        << (dir == 0 ? "Right" : "Left") << " | D=" << D << ", side=" << side << "\n");
     return BT::NodeStatus::SUCCESS;
 }

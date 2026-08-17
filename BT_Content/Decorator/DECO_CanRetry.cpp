@@ -1,4 +1,5 @@
 #include "DECO_CanRetry.h"
+#include "../BTLog.h"
 #include <iostream>
 
 using namespace Action;
@@ -63,15 +64,15 @@ BT::NodeStatus DECO_CanRetry::tick()
             if (retry_count_ < max_retries_ && IsCounterAttackValid())
             {
                 retry_count_++;
-                std::cout << "[CanRetry] 실패 - 다음 tick에서 재시도 "
-                    << retry_count_ << "/" << max_retries_ << "\n";
+                BT_VLOG("[CanRetry] 실패 - 다음 tick에서 재시도 "
+                    << retry_count_ << "/" << max_retries_ << "\n");
 
                 // 같은 tick에서 다시 실행하지 않고 다음 tick으로 넘긴다.
                 return BT::NodeStatus::RUNNING;
             }
 
             retry_count_ = 0;
-            std::cout << "[CanRetry] 재시도 종료 - FAILURE 반환\n";
+            BT_VLOG("[CanRetry] 재시도 종료 - FAILURE 반환\n");
             return BT::NodeStatus::FAILURE;
         }
 

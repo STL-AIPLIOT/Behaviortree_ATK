@@ -121,11 +121,20 @@ namespace Action
         static constexpr float R12_CONSERVE_THR_BIAS = 0.05f;    // R12: CONSERVE 를 더 보수적으로
         static constexpr float CLOSURE_TARGET_MS = 10.0f;    // 스위트 거리 밖에서 허용하는 접근률
 
-        // ================= WEZ (로깅 전용, 절대 넓히지 않는다) =================
-        // update_damage() 는 |ATA| <= wez.angle_deg/2 = 1.0 deg 에서만 데미지를 준다.
+        // ================= WEZ (참고값) =================
+        /*
+        [수정 2026-08-17] 판정 기준은 이제 BT_Content/WezPhase.h 가 갖는다.
+
+        아래 세 상수는 **학습 환경(DogFightEnv) update_damage() 기준**이다.
+        config.py 의 wez.angle_deg = 2.0 이고 판정이 angle_deg/2 이므로 1.0deg, 500~3000ft.
+
+        대회 판정은 규정 §6 대로 경과 시간에 따라 완화된다(1deg/3000ft -> 2deg/3500ft ->
+        3deg/4000ft). 그래서 이 상수들을 직접 비교에 쓰지 않고 WezPhase::BestCoeff() 를 쓴다.
+        값 자체는 로컬 검증(STIL_WEZ_MODE=training)과 문서 대조용으로 남긴다.
+        */
         static constexpr float WEZ_MIN_M = 152.4f;   // 500 ft
-        static constexpr float WEZ_MAX_M = 914.4f;   // 3000 ft
-        static constexpr float DAMAGE_ATA_DEG = 1.0f;     // 실효 데미지 콘. 각도 epsilon 없음
+        static constexpr float WEZ_MAX_M = 914.4f;   // 3000 ft (Phase 1)
+        static constexpr float DAMAGE_ATA_DEG = 1.0f;     // Phase 1 실효 데미지 콘
 
     private:
         enum Tier

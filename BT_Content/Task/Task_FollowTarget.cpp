@@ -1,4 +1,5 @@
 #include "Task_FollowTarget.h"
+#include "../BTLog.h"
 
 using namespace BT_Geometry;
 
@@ -23,14 +24,14 @@ namespace Action
         {
             // 비정상 LOS → 정면으로 임시 추종
             BB->VP_Cartesian = myPos + Vector3(1, 0, 0) * 1000.0;
-            std::cout << "[Pure/Lag] Fallback: invalid LOS\n";
+            BT_VLOG("[Pure/Lag] Fallback: invalid LOS\n");
             return BT::NodeStatus::SUCCESS;
         }
         if (!normalize(Hm) || !normalize(Ht))
         {
             // 진행방향 실패 → Pure 폴백
             BB->VP_Cartesian = tgtPos;
-            std::cout << "[Pure/Lag] Fallback: invalid forward vector(s)\n";
+            BT_VLOG("[Pure/Lag] Fallback: invalid forward vector(s)\n");
             return BT::NodeStatus::SUCCESS;
         }
 
@@ -48,10 +49,10 @@ namespace Action
         if (std::fabs(diff) <= EPS_DEG)
         {
             BB->VP_Cartesian = tgtPos; // Pure
-            std::cout << "[Pure] D=" << D
+            BT_VLOG("[Pure] D=" << D
                 << " theta_los=" << theta_los_deg
                 << " theta_m=" << theta_m_deg
-                << " |diff|=" << std::fabs(diff) << "\n";
+                << " |diff|=" << std::fabs(diff) << "\n");
         }
         // Lag: 내 기수가 LOS보다 뒤쪽
         else if (diff > (EPS_DEG + HYS_DEG))
@@ -59,21 +60,21 @@ namespace Action
             float Dref = clampf(D, D_MIN_REF, D_MAX_REF);
             Vector3 VP = tgtPos - Ht * (K_LAG * Dref); // 타깃 뒤쪽으로
             BB->VP_Cartesian = VP;
-            std::cout << "[Lag]  D=" << D
+            BT_VLOG("[Lag]  D=" << D
                 << " Dref=" << Dref
                 << " k=" << K_LAG
                 << " theta_los=" << theta_los_deg
                 << " theta_m=" << theta_m_deg
-                << " diff=" << diff << "\n";
+                << " diff=" << diff << "\n");
         }
         // 경계: Pure로 처리
         else
         {
             BB->VP_Cartesian = tgtPos;
-            std::cout << "[Pure*] boundary D=" << D
+            BT_VLOG("[Pure*] boundary D=" << D
                 << " theta_los=" << theta_los_deg
                 << " theta_m=" << theta_m_deg
-                << " diff=" << diff << "\n";
+                << " diff=" << diff << "\n");
         }
 
         // ===== 공통 보정: 거리/AA(0°)/AO(2°) =====

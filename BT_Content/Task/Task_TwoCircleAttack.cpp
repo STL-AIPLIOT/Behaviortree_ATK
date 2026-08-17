@@ -1,4 +1,5 @@
 #include "Task_TwoCircleAttack.h"
+#include "../BTLog.h"
 #include <algorithm>
 #include <cmath>
 
@@ -28,8 +29,8 @@ BT::NodeStatus Task_TwoCircleAttack::onStart()
 
     if (BB->HABFM_CircleMode != TWO_CIRCLE)
     {
-        std::cout << "[Task_TwoCircleAttack] skip | CircleMode="
-            << (BB->HABFM_CircleMode == ONE_CIRCLE ? "1C" : "NONE") << "\n";
+        BT_VLOG("[Task_TwoCircleAttack] skip | CircleMode="
+            << (BB->HABFM_CircleMode == ONE_CIRCLE ? "1C" : "NONE") << "\n");
         return BT::NodeStatus::FAILURE;
     }
 
@@ -60,7 +61,7 @@ BT::NodeStatus Task_TwoCircleAttack::Advance(CPPBlackBoard* BB)
     if (BB->HABFM_CircleMode != TWO_CIRCLE)
     {
         if (vp_saved_) { BB->VP_Cartesian = vp_on_entry_; }
-        std::cout << "[Task_TwoCircleAttack] abort | CircleMode changed, t=" << elapsed << "\n";
+        BT_VLOG("[Task_TwoCircleAttack] abort | CircleMode changed, t=" << elapsed << "\n");
         ResetInternalState();
         return BT::NodeStatus::FAILURE;
     }
@@ -86,8 +87,8 @@ BT::NodeStatus Task_TwoCircleAttack::Advance(CPPBlackBoard* BB)
 
         if (BB->RunningTime - settle_since_sec_ >= SETTLE_DWELL_SEC)
         {
-            std::cout << "[Task_TwoCircleAttack] resolved | AA=" << aa
-                << ", t=" << elapsed << "\n";
+            BT_VLOG("[Task_TwoCircleAttack] resolved | AA=" << aa
+                << ", t=" << elapsed << "\n");
             ResetInternalState();
             return BT::NodeStatus::SUCCESS;
         }
@@ -97,9 +98,9 @@ BT::NodeStatus Task_TwoCircleAttack::Advance(CPPBlackBoard* BB)
         settle_since_sec_ = -1.0;
     }
 
-    std::cout << "[Task_TwoCircleAttack] Two-Circle | dv=" << dv << ", D=" << D
+    BT_VLOG("[Task_TwoCircleAttack] Two-Circle | dv=" << dv << ", D=" << D
         << " | side_out=" << side_out << ", fwd=" << forward
-        << ", AA=" << aa << ", t=" << elapsed << "\n";
+        << ", AA=" << aa << ", t=" << elapsed << "\n");
     return BT::NodeStatus::RUNNING;
 }
 
@@ -111,8 +112,8 @@ void Task_TwoCircleAttack::onHalted()
     {
         CPPBlackBoard* BB = bb_res.value();
         BB->VP_Cartesian = vp_on_entry_;
-        std::cout << "[Task_TwoCircleAttack] halted | t="
-            << (BB->RunningTime - entry_time_sec_) << "\n";
+        BT_VLOG("[Task_TwoCircleAttack] halted | t="
+            << (BB->RunningTime - entry_time_sec_) << "\n");
     }
 
     ResetInternalState();

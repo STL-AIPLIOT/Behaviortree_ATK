@@ -34,16 +34,25 @@
             <Fallback name="SelectAndExecuteBFM">
 
                 <!-- 지면 회피: 모든 BFM 보다 우선한다. -->
-                <!-- 이 분기가 없어서 40판 내내 Task_ClimbToSafeAltitude 가 0 tick 이었고 -->
-                <!-- (등록만 돼 있고 Rule.xml 에 원소가 없었다) 전판이 고도 바닥으로 끝났다. -->
-                <!-- 임계 1200m 는 노드 자신의 kFloor 와 같은 값이다. 초기 고도 7000m, -->
-                <!-- run_local_dogfight 의 킬 플로어 300m 사이라 회복 여유가 충분하다. -->
-                <!-- DECO_AltitudeCheck 는 현재 고도뿐 아니라 2초 예측 고도와 -->
-                <!-- 급강하(Vz<-15 또는 pitch<-5)까지 보고 조기 개입한다. -->
+                <!--                                                                      -->
+                <!-- [수정 2026-08-17] Altitude 1200 -> 450.                              -->
+                <!--                                                                      -->
+                <!-- 1200m 는 규정 §5 의 초기 배치 고도("약 2000~3000ft" = 약 610~914m)보다 -->
+                <!-- **높다**. 대회 서버에서는 경기 시작 순간부터 이 분기가 Fallback 최상단을 -->
+                <!-- 계속 점유해 SCISSORS/HABFM/OBFM/DBFM 이 한 번도 실행되지 않는다.        -->
+                <!-- 교전 자체가 성립하지 않는 값이었다. 주최측 교전뷰어 패치(BattleServer   -->
+                <!-- V0.1)로 초기 고도가 시나리오 설정값이 됐으므로 더더욱 고정 가정은 위험하다.-->
+                <!--                                                                      -->
+                <!-- 450m 는 추락선 300m 위 150m 여유이고 어떤 초기 배치 고도보다 낮다.      -->
+                <!-- 급강하 방어는 DECO_AltitudeCheck 의 3초 예측 고도가 맡는다:            -->
+                <!--   -244 m/s 강하 -> 1182m 에서 발화(예전 정적 1200m 과 사실상 동일)      -->
+                <!--   -60  m/s 강하 ->  630m 에서 발화                                    -->
+                <!-- 여기 값과 Task_ClimbToSafeAltitude 의 kFloor 는 항상 같아야 한다.       -->
+                <!--                                                                      -->
                 <!-- 우선권은 매 tick 이 체크가 재평가해 유지한다. Task 가 RUNNING 을 -->
                 <!-- 돌려주는 방식이 아니다 - SyncActionNode 는 RUNNING 에서 예외를 던진다. -->
                 <Sequence name="GroundAvoidance_Branch">
-                    <DECO_AltitudeCheck BB="{BB}" UpDown="Less" Altitude="1200"/>
+                    <DECO_AltitudeCheck BB="{BB}" UpDown="Less" Altitude="450"/>
                     <Task_ClimbToSafeAltitude BB="{BB}"/>
                 </Sequence>
 

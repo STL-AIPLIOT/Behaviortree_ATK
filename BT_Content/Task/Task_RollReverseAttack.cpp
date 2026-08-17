@@ -1,4 +1,5 @@
 #include "Task_RollReverseAttack.h"
+#include "../BTLog.h"
 
 using namespace Action;
 
@@ -38,8 +39,8 @@ BT::NodeStatus Task_RollReverseAttack::tick()
 
     BB->VP_Cartesian = BB->MyLocation_Cartesian + reverse_offset;
 
-    std::cout << "[Task_RollReverseAttack] Roll Reverse 수행 | D=" << D
-        << " | side=" << side << ", back=" << back << "\n";
+    BT_VLOG("[Task_RollReverseAttack] Roll Reverse 수행 | D=" << D
+        << " | side=" << side << ", back=" << back << "\n");
 
     return BT::NodeStatus::SUCCESS;
 }

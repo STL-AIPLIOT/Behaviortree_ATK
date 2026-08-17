@@ -1,4 +1,6 @@
 #include "Task_AggressiveOBFM.h"
+#include "../BTLog.h"
+#include "../WezPhase.h"
 
 #include <algorithm>
 #include <cmath>
@@ -87,7 +89,7 @@ namespace Action
                     {
                         out << "t,mode,tier,D,ata_deg,aa_nose_deg,ao_deg,closure_ms,"
                             "my_spd_ms,tgt_spd_ms,ecmp,round,throttle,gun_window,"
-                            "vp_x,vp_y,vp_z\n";
+                            "wez_phase,gun_coeff,vp_x,vp_y,vp_z\n";
                         out.flush();
                     }
                 }
@@ -180,13 +182,35 @@ namespace Action
         if (!own_situation)
         {
             prev_tier_ = TIER_CONSERVE;   // 재진입은 보수적으로 시작
-            std::cout << "[Task_AggressiveOBFM] yield | sight=" << BB->EnemyInSight
-                << ", D=" << D << ", ATA=" << ata << "\n";
+            BT_VLOG("[Task_AggressiveOBFM] yield | sight=" << BB->EnemyInSight
+                << ", D=" << D << ", ATA=" << ata << "\n");
             return BT::NodeStatus::FAILURE;
         }
 
         const RoundProfile round = ResolveRoundProfile();
         const int ecmp = BB->EnergyCompareResult;
+
+        /*
+        [추가 2026-08-17] 규정 §6 Phase 반영.
+
+        이 노드는 대미지 창을 1.0deg / 152.4~914.4m 로 고정하고 "절대 넓히지 않는다"고
+        적어 두었다. 그 값은 학습 환경(DogFightEnv update_damage)에는 맞지만 **대회 판정과는
+        다르다**. 규정 §6 은 경과 시간에 따라 판정을 완화한다:
+
+            Phase 1   0~100s   LOS<1deg  500~3000ft  계수 1.0
+            Phase 2 100~150s   LOS<2deg  500~3500ft  계수 0.3
+            Phase 3 150~200s   LOS<3deg  500~4000ft  계수 0.1
+
+        콘 부피비는 거리까지 포함해 1 : 6.36 : 21.37 이다. 1deg 창만 노리는 행동 티어는
+        100초 이후 20배 넓어진 판정면을 통째로 버린다. 2026-08-15 로그 40판이 38판 시간만료로
+        끝났고 그중 대부분이 100초를 훌쩍 넘겼으므로, 이 손실은 이론이 아니라 실측 구간이다.
+
+        티어 임계(1.5/2.5/3.0deg)는 "대미지 콘 1deg 를 물기 위한 행동 강도"로 잡힌 값이므로
+        현재 열린 창의 폭에 비례해 함께 넓힌다. Phase 1 에서는 배율 1.0 이라 종전과 동일하다.
+        */
+        const double match_t = BB->MatchTimeSec();
+        const WezPhase::Window open_win = WezPhase::WidestOpen(match_t);
+        const float phase_scale = open_win.max_ata_deg / WezPhase::kPhase[0].max_ata_deg;
 
         // 건 리드점: 유효 탄속(내 속도 + K_MUZZLE)으로 비행시간을 만들고 그만큼 앞을 찍는다.
         const float t_flight = clampf(D / std::max(1.0f, BB->MySpeed_MS + K_MUZZLE),
@@ -235,9 +259,14 @@ namespace Action
             // 4. ATA 기반 행동 티어 (히스테리시스)
             //    2.5~3.0 deg 버퍼 구간에서는 직전 티어를 유지한다.
             // -----------------------------------------------------------
-            if (ata <= ALLOUT_ATA)          tier = TIER_ALL_OUT;
-            else if (ata <= TIER_UP_ATA)    tier = TIER_PURSUE;    // 2.5 이하로 좁혀지면 상승
-            else if (ata >= TIER_DOWN_ATA)  tier = TIER_CONSERVE;  // 3.0 이상 벌어지면 하강
+            // 임계는 현재 열린 대미지 창의 폭에 비례한다(Phase 1 = 배율 1.0, 종전과 동일).
+            const float allout_ata = ALLOUT_ATA * phase_scale;
+            const float tier_up_ata = TIER_UP_ATA * phase_scale;
+            const float tier_down_ata = TIER_DOWN_ATA * phase_scale;
+
+            if (ata <= allout_ata)          tier = TIER_ALL_OUT;
+            else if (ata <= tier_up_ata)    tier = TIER_PURSUE;    // 좁혀지면 상승
+            else if (ata >= tier_down_ata)  tier = TIER_CONSERVE;  // 벌어지면 하강
             else                            tier = prev_tier_;     // 버퍼 구간
 
             switch (tier)
@@ -338,18 +367,20 @@ namespace Action
 
         // ---------------------------------------------------------------
         // 5. 계측
-        //    gun_window 는 update_damage() 의 실제 판정과 같은 값(1 deg, 152.4~914.4 m)으로만
-        //    센다. 행동 티어의 1.5/2.5/3.0 deg 와 절대 섞지 않는다.
+        //    gun_window 는 **실제 판정과 같은 기준**으로만 센다. 행동 티어의 임계와 절대 섞지 않는다.
+        //    [수정 2026-08-17] 고정 1deg/914.4m -> 규정 §6 Phase 판정(WezPhase).
+        //    STIL_WEZ_MODE=training 을 주면 학습 환경 update_damage() 와 동일한 고정 창으로
+        //    되돌아가므로, 이전 판과 같은 잣대로 비교해야 할 때 그쪽을 쓴다.
         // ---------------------------------------------------------------
-        const bool gun_window =
-            (D > WEZ_MIN_M) && (D < WEZ_MAX_M) && (ata <= DAMAGE_ATA_DEG);
+        const float gun_coeff = WezPhase::BestCoeff(match_t, ata, D);
+        const bool gun_window = (gun_coeff > 0.0f);
 
         AggrCsv& csv = AggrCsv::Instance();
         if (csv.IsEnabled())
         {
             std::string row;
             row.reserve(224);
-            row += std::to_string(BB->RunningTime); row += ",";
+            row += std::to_string(match_t);         row += ",";   // 규정 §6 기준 경과 시간
             row += mode;                            row += ",";
             row += TierName(tier);                  row += ",";
             row += std::to_string(D);               row += ",";
@@ -363,6 +394,8 @@ namespace Action
             row += (round == ROUND_R3 ? "R3" : "R12"); row += ",";
             row += std::to_string(BB->Throttle);    row += ",";
             row += (gun_window ? "1" : "0");        row += ",";
+            row += std::to_string(WezPhase::PhaseAt(match_t)); row += ",";
+            row += std::to_string(gun_coeff);       row += ",";
             row += std::to_string(BB->VP_Cartesian.X); row += ",";
             row += std::to_string(BB->VP_Cartesian.Y); row += ",";
             row += std::to_string(BB->VP_Cartesian.Z);
@@ -372,14 +405,14 @@ namespace Action
         // 콘솔은 상태가 바뀔 때만 낸다(매 tick 찍으면 20판 로그가 읽을 수 없게 된다).
         if (tier != tier_before || overshoot_risk || gun_window)
         {
-            std::cout << "[Task_AggressiveOBFM] " << mode
+            BT_VLOG("[Task_AggressiveOBFM] " << mode
                 << " | tier=" << TierName(tier)
                 << ", ATA=" << ata
                 << ", D=" << D
                 << ", closure=" << closure
                 << ", thr=" << BB->Throttle
                 << ", gun_window=" << (gun_window ? 1 : 0)
-                << "\n";
+                << "\n");
         }
 
         return BT::NodeStatus::SUCCESS;

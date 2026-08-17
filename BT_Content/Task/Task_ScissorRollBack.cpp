@@ -1,4 +1,5 @@
 #include "Task_ScissorRollBack.h"
+#include "../BTLog.h"
 #include <iostream>
 #include <random>
 #include <chrono>
@@ -36,7 +37,7 @@ BT::NodeStatus Task_ScissorRollBack::tick()
     evade_offset = evade_offset - BB->TargetForwardVector * back;
     BB->VP_Cartesian = BB->MyLocation_Cartesian + evade_offset;
 
-    std::cout << "[Task_ScissorRollBack] RollBack (" << (dir == 0 ? "Up" : "Right")
-        << ") | D=" << D << ", side=" << side << ", up=" << up << ", back=" << back << "\n";
+    BT_VLOG("[Task_ScissorRollBack] RollBack (" << (dir == 0 ? "Up" : "Right")
+        << ") | D=" << D << ", side=" << side << ", up=" << up << ", back=" << back << "\n");
     return BT::NodeStatus::SUCCESS;
 }

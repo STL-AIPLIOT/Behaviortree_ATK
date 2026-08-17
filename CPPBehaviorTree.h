@@ -43,9 +43,22 @@ private:
 	double aile0;
 	double eccen;
 
+	/*
+	[추가 2026-08-17] 주최측 2026-05-26 패치 대응.
+	패치된 LibMain.cpp::CreateBehaviorTree 는 init() 후 IsInitialized() 를 물어보고
+	true 일 때만 BTList 에 등록한다. 이 멤버와 아래 접근자가 없으면
+	(1) 패치된 LibMain.cpp 와 함께 빌드할 때 컴파일이 깨지고,
+	(2) 억지로 맞춰도 등록이 안 되면 Step()이 "No BT found" 로 빠져
+	    RollCMD/PitchCMD/RudderCMD/Throttle 이 전부 0 으로 나간다 = 경기 내내 무조작.
+	*/
+	bool bInitialized;
+
 private:
 	//Lat, Lon, 고도는 meter
 	Vector3 LLAtoCartesian(Vector3 LLA, Vector3 BaseLLA);
+
+	//Factory 에 노드 타입을 등록한다. 예전 init() 본문 앞부분이다.
+	void RegisterNodes();
 
 public:	
 	int ID;			//리눅스환경에서 사용하는 변수
@@ -62,7 +75,13 @@ public:
 	
 	
 	//트리 xml과 각 노드들을 load하고 블랙보드를 초기화 하는 부분
-	void init();	
+	void init();
+
+	/*
+	init() 이 예외 없이 끝나고 트리·블랙보드가 모두 연결됐는지.
+	LibMain.cpp::CreateBehaviorTree 가 등록 여부를 이 값으로 결정한다.
+	*/
+	bool IsInitialized() const;
 
 	/*
 	비헤비어트리를 통하여 추적점 생성

@@ -1,4 +1,5 @@
 #include "Task_CornerLeadPursuit.h"
+#include "../BTLog.h"
 #include <algorithm>
 #include <cmath>
 
@@ -31,10 +32,10 @@ BT::NodeStatus Task_CornerLeadPursuit::tick()
         !((D < OVERSHOOT_D_M) && (dv > OVERSHOOT_DV_MS));
 
     // 진입률 집계용. 매 tick 한 줄씩 남긴다 (Docs/12 T8).
-    std::cout << "[Task_CornerLeadPursuit] cond | speed=" << (inCornerSpeedBand ? 1 : 0)
+    BT_VLOG("[Task_CornerLeadPursuit] cond | speed=" << (inCornerSpeedBand ? 1 : 0)
         << " window=" << (inLeadPursuitWindow ? 1 : 0)
         << " noOvershoot=" << (noOvershootRisk ? 1 : 0)
-        << " | V=" << V << ", AO=" << ao << ", D=" << D << ", dv=" << dv << "\n";
+        << " | V=" << V << ", AO=" << ao << ", D=" << D << ", dv=" << dv << "\n");
 
     if (!(inCornerSpeedBand && inLeadPursuitWindow && noOvershootRisk))
     {
@@ -48,8 +49,8 @@ BT::NodeStatus Task_CornerLeadPursuit::tick()
 
     BB->VP_Cartesian = BB->TargetLocaion_Cartesian + BB->PredictedTargetVelocity * lead_time;
 
-    std::cout << "[Task_CornerLeadPursuit] ENTER | lead_time=" << lead_time
-        << ", V=" << V << ", AO=" << ao << ", D=" << D << "\n";
+    BT_VLOG("[Task_CornerLeadPursuit] ENTER | lead_time=" << lead_time
+        << ", V=" << V << ", AO=" << ao << ", D=" << D << "\n");
 
     return BT::NodeStatus::SUCCESS;
 }

@@ -1,4 +1,5 @@
 #include "SetBFMMode_HABFM.h"
+#include "../BTLog.h"
 #include <cmath>
 #include <iostream>
 #include <algorithm>
@@ -42,7 +43,11 @@ namespace
 */
 void SetBFMMode_HABFM::UpdateTurnRates(CPPBlackBoard* BB)
 {
-    const double now = BB->RunningTime;
+    // [수정 2026-08-17] RunningTime -> MatchTimeSec().
+    // RunningTime 은 호스트가 SetBehaviorTreeDeltaTime 을 부르지 않으면 블랙보드 기본값을
+    // 누적한다. 그 기본값이 실제 프레임 간격의 1/3 이라 dt 가 1/3 로 들어왔고, 선회율이
+    // 3배로 부풀려져 1C/2C 선택이 어긋났다. 아래 임계값들은 모두 '실제 초' 기준이다.
+    const double now = BB->MatchTimeSec();
     const double myYaw = BB->MyRotation_EDegree.Yaw;
     const double targetYaw = BB->TargetRotation_EDegree.Yaw;
 
@@ -130,12 +135,31 @@ BT::NodeStatus SetBFMMode_HABFM::tick()
     UpdateTurnRates(BB);
 
     const bool sight = BB->EnemyInSight;
-    const double aa = BB->MyAspectAngle_Degree;   // 0: 같은 방향, 180: 정반대(헤드온)
+
+    /*
+    [수정 2026-08-17] AA 규약 정정. 아래 주석이 틀려 있었고 조건도 반대로 걸려 있었다.
+
+    이전 주석 "0: 같은 방향, 180: 정반대(헤드온)" 은 앵글오프(HCA) 규약이다.
+    실제 BB->MyAspectAngle_Degree 는 AspectAngleUpdate.cpp:23-31 이 만드는 **애스펙트각**으로
+        0   = 내가 적기 코앞 (적기 기수가 나를 향함) = 헤드온
+        180 = 내가 적기 6시                          = 공격 위치
+    이다. 따라서 |AA-180| <= 40 (= AA 140~180) 은 헤드온이 아니라 **내가 적기 후방을 잡은**
+    상황이었고, 하필 그때 1-circle/2-circle 머지 선회를 걸고 있었다. 애써 만든 공격 기하를
+    헤드온 기동으로 되돌려 버린 셈이다. SetBFMMode_OBFM 의 게이트와 정확히 뒤바뀌어 있어
+    그쪽도 함께 정정했다.
+
+    두 기체가 서로 마주 접근하는지는 애스펙트각만으로 부족하다(적기 정면에 있어도 내가
+    등을 돌리고 있을 수 있다). 기수 교차각 BB->MyAngleOff_Degree 를 함께 본다
+    (AngleOffUpdate.cpp:20 — 두 ForwardVector 사이 각, 180 = 정면 대향).
+    */
+    const double aa = BB->MyAspectAngle_Degree;   // 0 = 적기 정면(헤드온), 180 = 적기 6시
+    const double ao = BB->MyAngleOff_Degree;      // 0 = 같은 방향, 180 = 기수 정반대
     const double D = BB->Distance;
     const int    ec = BB->EnergyCompareResult;    // >=0 권장
 
-    // [개선] HABFM 진입 창: |AA-180| <= 40°, 800m <= D <= 2000m, 에너지 ≥ 0, 시야 必
-    const bool aa_ok = (std::abs(aa - 180.0) <= 40.0);
+    // HABFM 진입 창: 적기 정면 반구(AA <= 40) + 기수 대향(AO >= 140),
+    //                800m <= D <= 2000m, 에너지 >= 0, 시야 必
+    const bool aa_ok = (aa <= 40.0) && (ao >= 140.0);
     const bool dist_ok = (D >= 800.0 && D <= 2000.0);
     const bool e_ok = (ec >= 0);
 
@@ -143,15 +167,15 @@ BT::NodeStatus SetBFMMode_HABFM::tick()
     {
         BB->BFM = HABFM;
         UpdateCircleMode(BB);
-        std::cout << "[SetBFMMode_HABFM] t=" << BB->RunningTime << "s | Enter HABFM | AA=" << aa
-            << ", D=" << D << ", E=" << ec
+        BT_VLOG("[SetBFMMode_HABFM] t=" << BB->MatchTimeSec() << "s | Enter HABFM | AA=" << aa
+            << ", AO=" << ao << ", D=" << D << ", E=" << ec
             << " | myTR=" << MyTurnRate_DegSec << ", tgtTR=" << TargetTurnRate_DegSec
             << ", Circle=" << (BB->HABFM_CircleMode == ONE_CIRCLE ? "1C" :
-                              (BB->HABFM_CircleMode == TWO_CIRCLE ? "2C" : "NONE")) << "\n";
+                              (BB->HABFM_CircleMode == TWO_CIRCLE ? "2C" : "NONE")) << "\n");
         return BT::NodeStatus::SUCCESS;
     }
 
-    std::cout << "[SetBFMMode_HABFM] t=" << BB->RunningTime << "s | Blocked | sight=" << sight
-        << ", AA=" << aa << ", D=" << D << ", E=" << ec << "\n";
+    BT_VLOG("[SetBFMMode_HABFM] t=" << BB->MatchTimeSec() << "s | Blocked | sight=" << sight
+        << ", AA=" << aa << ", AO=" << ao << ", D=" << D << ", E=" << ec << "\n");
     return BT::NodeStatus::FAILURE;
 }

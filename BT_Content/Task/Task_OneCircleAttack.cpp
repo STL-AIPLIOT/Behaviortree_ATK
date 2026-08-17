@@ -1,4 +1,5 @@
 #include "Task_OneCircleAttack.h"
+#include "../BTLog.h"
 #include <algorithm>
 #include <cmath>
 
@@ -32,8 +33,8 @@ BT::NodeStatus Task_OneCircleAttack::onStart()
     if (BB->HABFM_CircleMode != ONE_CIRCLE)
     {
         // 1-circle 차례가 아니다. 2-circle 또는 reposition 에게 넘긴다.
-        std::cout << "[Task_OneCircleAttack] skip | CircleMode="
-            << (BB->HABFM_CircleMode == TWO_CIRCLE ? "2C" : "NONE") << "\n";
+        BT_VLOG("[Task_OneCircleAttack] skip | CircleMode="
+            << (BB->HABFM_CircleMode == TWO_CIRCLE ? "2C" : "NONE") << "\n");
         return BT::NodeStatus::FAILURE;
     }
 
@@ -65,7 +66,7 @@ BT::NodeStatus Task_OneCircleAttack::Advance(CPPBlackBoard* BB)
     if (BB->HABFM_CircleMode != ONE_CIRCLE)
     {
         if (vp_saved_) { BB->VP_Cartesian = vp_on_entry_; }
-        std::cout << "[Task_OneCircleAttack] abort | CircleMode changed, t=" << elapsed << "\n";
+        BT_VLOG("[Task_OneCircleAttack] abort | CircleMode changed, t=" << elapsed << "\n");
         ResetInternalState();
         return BT::NodeStatus::FAILURE;
     }
@@ -92,8 +93,8 @@ BT::NodeStatus Task_OneCircleAttack::Advance(CPPBlackBoard* BB)
 
         if (BB->RunningTime - settle_since_sec_ >= SETTLE_DWELL_SEC)
         {
-            std::cout << "[Task_OneCircleAttack] resolved | AA=" << aa
-                << ", t=" << elapsed << "\n";
+            BT_VLOG("[Task_OneCircleAttack] resolved | AA=" << aa
+                << ", t=" << elapsed << "\n");
             ResetInternalState();
             return BT::NodeStatus::SUCCESS;
         }
@@ -103,9 +104,9 @@ BT::NodeStatus Task_OneCircleAttack::Advance(CPPBlackBoard* BB)
         settle_since_sec_ = -1.0;
     }
 
-    std::cout << "[Task_OneCircleAttack] One-Circle | dv=" << dv << ", D=" << D
+    BT_VLOG("[Task_OneCircleAttack] One-Circle | dv=" << dv << ", D=" << D
         << " | side_in=" << side_in << ", fwd=" << forward
-        << ", AA=" << aa << ", t=" << elapsed << "\n";
+        << ", AA=" << aa << ", t=" << elapsed << "\n");
     return BT::NodeStatus::RUNNING;
 }
 
@@ -118,8 +119,8 @@ void Task_OneCircleAttack::onHalted()
     {
         CPPBlackBoard* BB = bb_res.value();
         BB->VP_Cartesian = vp_on_entry_;
-        std::cout << "[Task_OneCircleAttack] halted | t="
-            << (BB->RunningTime - entry_time_sec_) << "\n";
+        BT_VLOG("[Task_OneCircleAttack] halted | t="
+            << (BB->RunningTime - entry_time_sec_) << "\n");
     }
 
     ResetInternalState();

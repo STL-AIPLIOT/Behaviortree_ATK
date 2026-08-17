@@ -2,6 +2,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#include <exception>
+#include <iostream>
 
 namespace Action {
 
@@ -29,7 +31,20 @@ namespace Action {
 
         CPPBlackBoard* BB = BBopt.value();
         const std::string mode = updownO.value();
-        const float targetAlt = std::stof(altO.value());
+
+        // [수정 2026-08-17] std::stof 는 XML 오타에 대해 예외를 던진다. RunCPPBT 의 try-catch 가
+        // 받아 주긴 하지만, 그 순간부터 경기 내내 안전 폴백으로 날게 된다. 여기서 막는다.
+        float targetAlt = 0.0f;
+        try
+        {
+            targetAlt = std::stof(altO.value());
+        }
+        catch (const std::exception&)
+        {
+            std::cerr << "[DECO_AltitudeCheck] bad Altitude port value: '"
+                << altO.value() << "'\n";
+            return NodeStatus::FAILURE;
+        }
 
         // 현재 고도
         const float Z = static_cast<float>(BB->MyLocation_Cartesian.Z);
@@ -40,8 +55,18 @@ namespace Action {
         // 기수 피치(도): 전방벡터 Z성분으로 근사
         const float pitch_deg = std::asin(clampf((float)BB->MyForwardVector.Z, -1.0f, 1.0f)) * 57.29578f;
 
-        // 2초 후 예측 고도
-        const float horizon = 2.0f;
+        /*
+        예측 고도.
+
+        [수정 2026-08-17] 2.0s -> 3.0s.
+        Rule.xml 의 정적 임계를 1200m 에서 450m 로 내렸기 때문에(규정 §5 초기 배치 고도 대응,
+        아래 Rule.xml 주석 참조) 급강하에 대한 방어를 예측 구간이 대신 맡는다.
+          -244 m/s 로 꽂히는 경우: 450 + 244*3 = 1182m 에서 발화 -> 예전 정적 1200m 과 사실상 동일
+          -60  m/s 로 완만히 내려가는 경우: 450 + 180 = 630m 에서 발화
+        즉 위험한 강하에는 예전만큼 일찍 개입하면서, 낮은 고도에서 수평 비행 중일 때
+        분기를 통째로 점유하지는 않는다.
+        */
+        const float horizon = 3.0f;
         const float Z_pred = Z + Vz_est * horizon;
 
         if (mode == "Greater") {

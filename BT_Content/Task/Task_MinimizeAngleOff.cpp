@@ -1,4 +1,5 @@
 #include "Task_MinimizeAngleOff.h"
+#include "../BTLog.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream> // 콘솔 로그
@@ -32,13 +33,13 @@ namespace Action
     {
         Optional<CPPBlackBoard*> BB = getInput<CPPBlackBoard*>("BB");
         if (!BB) {
-            std::cout << "[MinimizeAngleOff] 조건 미충족 → FAILURE (BB 입력 실패)" << std::endl;
+            BT_VLOG("[MinimizeAngleOff] 조건 미충족 → FAILURE (BB 입력 실패)" << std::endl);
             return NodeStatus::FAILURE;
         }
         CPPBlackBoard* bb = *BB;
 
         if (bb->Enemy.empty()) {
-            std::cout << "[MinimizeAngleOff] 조건 미충족 → FAILURE (적기 없음)" << std::endl;
+            BT_VLOG("[MinimizeAngleOff] 조건 미충족 → FAILURE (적기 없음)" << std::endl);
             return NodeStatus::FAILURE;
         }
 
@@ -49,7 +50,7 @@ namespace Action
         Vector3 targetFwd = bb->TargetForwardVector; // 서비스 노드에서 이미 계산됨
         normalize(targetFwd);
         if (vecMag(targetFwd) < 1e-6f) {
-            std::cout << "[MinimizeAngleOff] 조건 미충족 → FAILURE (타겟 전방벡터 비정상)" << std::endl;
+            BT_VLOG("[MinimizeAngleOff] 조건 미충족 → FAILURE (타겟 전방벡터 비정상)" << std::endl);
             return NodeStatus::FAILURE;
         }
 
@@ -61,7 +62,7 @@ namespace Action
         float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
         if (distance < 1e-3f) distance = 1e-3f;
 
-        std::cout << "[MinimizeAngleOff] Distance=" << distance << std::endl;
+        BT_VLOG("[MinimizeAngleOff] Distance=" << distance << std::endl);
 
         Vector3 myForward = bb->MyForwardVector;
         normalize(myForward);
@@ -72,7 +73,7 @@ namespace Action
         if (dot < -1.0f) dot = -1.0f;
 
         float angleDeg = std::acos(dot) * RAD2DEG;
-        std::cout << "[MinimizeAngleOff] angleDeg=" << angleDeg << std::endl;
+        BT_VLOG("[MinimizeAngleOff] angleDeg=" << angleDeg << std::endl);
 
         // 파라미터(없으면 기본값 사용)
         double lookMin = 200.0, lookMax = 500.0;
@@ -94,7 +95,7 @@ namespace Action
         bb->VP_Cartesian = VP;
         bb->Throttle = 1.0f; // 속도 관리는 별도 CornerSpeed 노드에서 하도록
 
-        std::cout << "[MinimizeAngleOff] Minimize AO 실행!" << std::endl;
+        BT_VLOG("[MinimizeAngleOff] Minimize AO 실행!" << std::endl);
 
         return NodeStatus::SUCCESS;
     }

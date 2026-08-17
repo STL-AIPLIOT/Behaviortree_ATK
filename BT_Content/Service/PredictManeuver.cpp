@@ -71,6 +71,48 @@ namespace Action
 		prevPositions.push_back(currentPos);
 		prevHeadings.push_back(currentYaw);
 
+		/*
+		[추가 2026-08-17] BB->PredictedTargetVelocity 를 실제로 채운다.
+
+		이 필드는 CPPBlackBoard 생성자에서 (0,0,0) 으로 초기화된 뒤
+		**어느 노드도 값을 쓰지 않고 있었다**. 반면 읽는 곳은 넷이다:
+
+		  Task_LeadPursuit.cpp:66        VP = TargetLocation + PredictedTargetVelocity * lead_time
+		  Task_CornerLeadPursuit.cpp:49  VP = TargetLocation + PredictedTargetVelocity * lead_time
+		  Task_LeadEntry.cpp:51
+		  Task_AggressiveOBFM.cpp:155    (여기만 length()<=0.1 가드로 기수*속력 대체)
+
+		즉 앞의 두 노드에서 식이 항상 VP = TargetLocation 으로 축약되어, 리드 추적을 한다고
+		믿으면서 실제로는 **순수 추적(pure pursuit)** 을 하고 있었다. 선회하는 표적을 순수
+		추적하면 리드각만큼 항상 뒤처지는데 대미지 콘은 규정 §6 Phase 1 기준 1deg 다.
+		2026-08-15 로그 40판에서 후방 추적 사격 시간이 정확히 0.00초였던 직접적 원인이다.
+
+		이 노드가 이미 표적 위치 이력(prevPositions)을 쌓고 있으므로 추가 상태 없이 만든다.
+		속도는 이력 양 끝의 위치차 / 경과시간이다. 순간 차분(마지막 두 점)은 60Hz 에서
+		노이즈가 커서 쓰지 않는다.
+		*/
+		if (prevPositions.size() >= 2)
+		{
+			const Vector3 oldest = prevPositions.front();
+			const Vector3 newest = prevPositions.back();
+
+			// 표본 간격 = (표본 수 - 1) * tick 간격. 규정 §4 의 60Hz 고정 프레임을 쓴다.
+			const double span =
+				static_cast<double>(prevPositions.size() - 1) * CPPBlackBoard::SIM_DT_SEC;
+
+			if (span > 1e-6)
+			{
+				Vector3 v = (newest - oldest) / span;
+
+				// 비유한 값이 블랙보드로 새어 나가면 VP 가 NaN 이 되고, 주최측 패치가
+				// 그것을 조용히 [0,0,0](= 지면)으로 치환한다. 여기서 막는다.
+				if (std::isfinite(v.X) && std::isfinite(v.Y) && std::isfinite(v.Z))
+				{
+					(*BB)->PredictedTargetVelocity = v;
+				}
+			}
+		}
+
 		// 충분한 방향 데이터가 쌓이지 않았다면
 		// 아직 회전 방향을 판단하지 않는다.
 		if (prevHeadings.size() < historySize)

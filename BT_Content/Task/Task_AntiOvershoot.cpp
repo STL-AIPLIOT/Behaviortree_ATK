@@ -1,4 +1,5 @@
 #include "Task_AntiOvershoot.h"
+#include "../BTLog.h"
 #include <algorithm>
 
 namespace Action {  // �� �߰�
@@ -26,14 +27,14 @@ namespace Action {  // �� �߰�
             OBFM_Action Fallback이 항상 이 노드에서 끝나 Task_LeadPursuit /
             Task_FollowTarget이 한 번도 실행되지 않았다. FAILURE로 양보한다.
             */
-            std::cout << "[Task_AntiOvershoot] idle: D=" << D << ", dv=" << dv << "\n";
+            BT_VLOG("[Task_AntiOvershoot] idle: D=" << D << ", dv=" << dv << "\n");
             return BT::NodeStatus::FAILURE;
         }
 
         const float back = std::max(150.0f, std::min(450.0f, 150.0f + 10.0f * dv)); // [����]
         BB->VP_Cartesian = BB->TargetLocaion_Cartesian - BB->TargetForwardVector * back;
-        std::cout << "[Task_AntiOvershoot] triggered: D=" << D
-            << ", dv=" << dv << ", back=" << back << "\n";
+        BT_VLOG("[Task_AntiOvershoot] triggered: D=" << D
+            << ", dv=" << dv << ", back=" << back << "\n");
 
         return BT::NodeStatus::SUCCESS;
     }

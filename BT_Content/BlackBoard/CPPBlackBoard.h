@@ -109,8 +109,33 @@ public:
 	~CPPBlackBoard();
 
 public:
+	/*
+	규정 §4: 서버는 60 Hz(DeltaTime 0.016666s)로 송신하고 접속기는 매 프레임 응답한다.
+	이 값은 시간 의존 로직(WEZ Phase, 선회율 샘플링, 추종 유지시간)의 유일한 기준이다.
+	*/
+	static constexpr double SIM_DT_SEC = 1.0 / 60.0;
+
 	double RunningTime;										//해당 시뮬레이션 실행시간
 	double DeltaSecond;										//비헤비어트리 작동 틱 판단 및 시간 계산용
+	long long TickCount;									//RunCPPBT 호출 횟수. MatchTimeSec()의 근거
+
+	/*
+	경기 경과 시간 [sec]. 시간 의존 판단은 RunningTime 이 아니라 이 값을 쓴다.
+
+	왜 RunningTime 을 쓰면 안 되나
+	------------------------------
+	RunningTime 은 DeltaSecond 누적이다. 그런데 RL 호스트(src/dogfight/ai/native_bt.py)는
+	CreateBehaviorTree / ChangeData / Step / GetVP / Reset / RemoveBT 여섯 개만 바인딩하고
+	SetBehaviorTreeDeltaTime 은 **바인딩조차 하지 않는다**. 따라서 SetDeltaTime()이 한 번도
+	호출되지 않고 CPPBlackBoard 생성자의 기본값이 그대로 쌓인다. 그 기본값이 0.005566170
+	이었기 때문에 RunningTime 이 실제의 약 1/3 로 흘렀다(2026-08-15 보고서 실측:
+	BFM t 58.21s <-> CSV 174.27s, tick 수는 10,458/10,456 으로 일치).
+
+	그 상태로는 규정 §6 의 Phase 2/3(100s/150s) 진입 판정이 200초 경기 내내 성립하지 않는다.
+	DeltaSecond 기본값은 아래 .cpp 에서 SIM_DT_SEC 로 바로잡았지만, 호스트가 다른 값을
+	넣어 주는 경로가 생겨도 흔들리지 않도록 경과 시간 자체는 tick 수에서 직접 만든다.
+	*/
+	double MatchTimeSec() const { return static_cast<double>(TickCount) * SIM_DT_SEC; }
 
 	std::vector<PlaneInfo> Friendly;						//아군기들 정보 Array
 	std::vector<PlaneInfo> Enemy;							//적기들 정보 Array

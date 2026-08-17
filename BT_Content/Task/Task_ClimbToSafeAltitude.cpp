@@ -1,4 +1,5 @@
 #include "Task_ClimbToSafeAltitude.h"
+#include "../BTLog.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -37,8 +38,18 @@ namespace Action {
         const float Vz_est = float(fwd.Z) * BB->MySpeed_MS;
         const float pitch_deg = std::asin(clampf(float(fwd.Z), -1.0f, 1.0f)) * 57.29578f;
 
-        // 안전고도(ft 또는 m, 프로젝트 단위에 맞추세요)
-        const float kFloor = 1200.0f;
+        /*
+        안전고도 [m]. MyLocation_Cartesian.Z 는 LLAtoCartesian 의 dD 이므로 미터 단위 고도다.
+
+        [수정 2026-08-17] 1200 -> 450. Rule.xml 의 DECO_AltitudeCheck Altitude 와 같은 값이어야 한다.
+
+        규정 §5: 추락선은 1000ft(약 300m), 초기 배치는 "약 2000~3000ft 고도대"(약 610~914m).
+        1200m 는 **초기 배치 고도보다 높다**. 그대로 두면 경기 시작 순간부터 지면 회피 분기가
+        Fallback 최상단을 계속 점유해 SCISSORS/HABFM/OBFM/DBFM 이 한 번도 실행되지 않는다.
+        450m 는 추락선 300m 위로 150m 여유이고, 어떤 초기 배치 고도보다도 낮다.
+        급강하 방어는 DECO_AltitudeCheck 의 3초 예측이 맡는다(같은 커밋).
+        */
+        const float kFloor = 450.0f;
         const float margin = 200.0f;
         const float curZ = float(myPos.Z);
 
@@ -81,13 +92,13 @@ namespace Action {
         const bool good_pitch = (pitch_deg >= 2.0f);
         const bool climbing = (Vz_est > 5.0f);
 
-        std::cout << "[Task_ClimbToSafeAltitude] Recovering"
+        BT_VLOG("[Task_ClimbToSafeAltitude] Recovering"
             << " | pitch=" << pitch_deg
             << " Vz_est=" << Vz_est
             << " | ahead=" << ahead << " climb=" << climb
             << " | fwd_hZ=0 targetZ=" << vp.Z << " curZ=" << curZ
             << " | safe=" << (safe_alt && good_pitch && climbing ? "YES" : "NO")
-            << "\n";
+            << "\n");
 
         // ---- 핵심 2: 회복 중에도 SUCCESS 를 돌려준다 ----
         // [회전2] 이 노드는 SyncActionNode 이고 SyncActionNode::executeTick() 은

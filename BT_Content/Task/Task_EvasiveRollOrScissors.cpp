@@ -1,4 +1,5 @@
 #include "Task_EvasiveRollOrScissors.h"
+#include "../BTLog.h"
 #include <algorithm>
 #include <chrono>
 #include <random>
@@ -78,10 +79,10 @@ BT::NodeStatus Task_EvasiveRollOrScissors::tick()
     // ���� ���� ��ǥ��
     BB->VP_Cartesian = BB->MyLocation_Cartesian + evasive_offset;
 
-    std::cout << "[Task_EvasiveRollOrScissors] ȸ��: "
+    BT_VLOG("[Task_EvasiveRollOrScissors] ȸ��: "
         << (choice == Dir::Right ? "Right" : choice == Dir::Left ? "Left" : "Up")
         << " | D=" << D << ", dv=" << dv
-        << " | side=" << side << ", up=" << up << "\n";
+        << " | side=" << side << ", up=" << up << "\n");
 
     return BT::NodeStatus::SUCCESS;
 }

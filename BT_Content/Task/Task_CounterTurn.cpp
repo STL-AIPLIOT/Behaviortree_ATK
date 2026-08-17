@@ -1,4 +1,5 @@
 #include "Task_CounterTurn.h"
+#include "../BTLog.h"
 #include <algorithm>
 
 using namespace Action;
@@ -42,9 +43,9 @@ BT::NodeStatus Task_CounterTurn::tick()
 
     BB->VP_Cartesian = BB->MyLocation_Cartesian + offset;
 
-    std::cout << "[Task_CounterTurn] CounterTurn: D=" << D
+    BT_VLOG("[Task_CounterTurn] CounterTurn: D=" << D
         << ", dv=" << dv << ", Energy=" << ecmp
-        << " | side=" << side << ", back=" << back << "\n";
+        << " | side=" << side << ", back=" << back << "\n");
 
     return BT::NodeStatus::SUCCESS;
 }

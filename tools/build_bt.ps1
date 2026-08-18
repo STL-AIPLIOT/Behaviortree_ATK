@@ -264,6 +264,12 @@ if ($Deploy) {
         }
     }
 
+    # [2026-08-18] 대상 파일을 먼저 지운다. Windows 는 대소문자를 구분하지 않지만
+    # 보존은 하므로, 예전 이름(예: Rule_stil.xml)이 남아 있으면 Copy-Item 이 내용만
+    # 덮어쓰고 이름은 옛 케이싱으로 유지한다. 런타임은 열리지만 규정 §9 제출물
+    # 이름이 틀리게 되고, ls 로 봐야만 드러나 조용히 넘어간다.
+    foreach ($p in @($teamDll, $teamXml)) { Remove-Item $p -Force -ErrorAction SilentlyContinue }
+
     Write-Host "`n[deploy] -> $ReleaseDir"
     Copy-Item $target.FullName -Destination $teamDll -Force
     Copy-Item (Join-Path $HostRoot "BehaviorTree\$RuleXmlSource") -Destination $teamXml -Force

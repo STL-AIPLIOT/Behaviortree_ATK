@@ -78,7 +78,12 @@ param(
     [string]$Platform    = "x64",
     [string]$TeamName    = "STIL_ATK",
     [string]$BinName     = "bin_atk",
-    [string]$RuleXmlName = "Rule_ATK.xml",
+    # [2026-08-18] 07f149f 가 저장소의 Rule.xml 을 Rule_STIL_ATK.xml 로 rename 하고
+    # CPPBehaviorTree.cpp 의 기본값도 "./Rule_STIL_ATK.xml" 로 바꿨다. 배포 이름을
+    # 그 기본값과 같게 두면 BT_RULE_XML 을 주지 않아도 올바른 XML 을 읽는다.
+    [string]$RuleXmlName = "Rule_STIL_ATK.xml",
+    # 저장소/호스트 트리 안에서의 XML 파일 이름.
+    [string]$RuleXmlSource = "Rule_STIL_ATK.xml",
     [switch]$Deploy,
     # A/B 비교용. 각도 wrap 보정만 끈 'before' DLL 을 만든다.
     # BT_Content/AngleUtil.h 의 PM_DISABLE_WRAP_FIX 설명 참조.
@@ -230,7 +235,7 @@ if (-not $Deploy) {
     # 빌드할 이유가 없어 이 스크립트조차 안 돌리게 되고, DLL 은 옛 XML 을 계속 읽는다.
     # 파싱은 성공하므로 에러 없이 노드 구성만 달라진다 — 조용해서 추적이 어렵다.
     $rtXml = Join-Path $ReleaseDir $RuleXmlName
-    $tmXml = Join-Path $TeamRoot   "Rule.xml"
+    $tmXml = Join-Path $TeamRoot   $RuleXmlSource
     if ((Test-Path $rtXml) -and (Test-Path $tmXml)) {
         $hr = (Get-FileHash $rtXml -Algorithm SHA256).Hash
         $ht = (Get-FileHash $tmXml -Algorithm SHA256).Hash
@@ -261,13 +266,12 @@ if ($Deploy) {
 
     Write-Host "`n[deploy] -> $ReleaseDir"
     Copy-Item $target.FullName -Destination $teamDll -Force
-    Copy-Item (Join-Path $HostRoot "BehaviorTree\Rule.xml") -Destination $teamXml -Force
+    Copy-Item (Join-Path $HostRoot "BehaviorTree\$RuleXmlSource") -Destination $teamXml -Force
     Write-Host "  $($target.Name) -> AIP_$TeamName.dll"
-    Write-Host "  Rule.xml -> $RuleXmlName"
+    Write-Host "  $RuleXmlSource -> $RuleXmlName"
     Write-Host ""
-    Write-Host "  이 DLL 은 기본값으로 ./Rule.xml 을 읽는다. ATK 용 XML 을 읽히려면"
-    Write-Host "  실행 프로세스에 환경변수를 줘야 한다:"
+    Write-Host "  이 DLL 의 기본 XML 은 ./$RuleXmlName 이고(CPPBehaviorTree.cpp),"
+    Write-Host "  배포 이름을 그와 같게 맞췄으므로 BT_RULE_XML 없이도 올바른 XML 을 읽는다."
+    Write-Host "  다른 XML 로 A/B 를 할 때만 환경변수를 준다:"
     Write-Host "        `$env:BT_RULE_XML = `"./$RuleXmlName`""
-    Write-Host "  주지 않으면 원본 트리가 배치한 Rule.xml 로 ATK DLL 이 돌아간다 —"
-    Write-Host "  파싱은 성공하므로 에러 없이 A/B 비교만 무의미해진다."
 }

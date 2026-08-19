@@ -1,4 +1,5 @@
 #include "SetBFMMode_HABFM.h"
+#include "../STIL_Tuning.h"
 #include "../BTLog.h"
 #include <cmath>
 #include <iostream>
@@ -160,7 +161,22 @@ BT::NodeStatus SetBFMMode_HABFM::tick()
     // HABFM 진입 창: 적기 정면 반구(AA <= 40) + 기수 대향(AO >= 140),
     //                800m <= D <= 2000m, 에너지 >= 0, 시야 必
     const bool aa_ok = (aa <= 40.0) && (ao >= 140.0);
-    const bool dist_ok = (D >= 800.0 && D <= 2000.0);
+    /*
+    [B/v4 2026-08-19] D 하한 800 -> 1200 (STIL_HABFM_DMIN).
+
+    v3p 실패의 직접 원인이 이 창이었다. WEZ 는 152~914m 인데 HABFM 이 800m 부터
+    열려 있어, 사격 진입로(WEZ 바로 바깥)를 1C/2C 선회가 덮었다. 기수를 정렬해야 할
+    구간에서 선회가 잡히니 사격 자세가 만들어지지 않았다.
+
+    하한을 1200 으로 올려 800~1200m 를 비운다. Rule.xml 의 분기 순서상
+    (SCISSORS -> HABFM -> OBFM -> DBFM) HABFM 이 실패하면 그 구간은 자연히
+    OBFM 이 가져간다 - 별도 배선 없이 C 와 맞물린다.
+
+    상한 2000 과 (AA <= 40 && AO >= 140) 은 그대로다. 이 변경 하나만으로
+    실험 2단계를 돌릴 수 있어야 하므로 다른 것을 건드리지 않는다.
+    구식 복원: STIL_HABFM_DMIN=800
+    */
+    const bool dist_ok = (D >= STIL::HabfmDMin() && D <= 2000.0);
     const bool e_ok = (ec >= 0);
 
     if (sight && aa_ok && dist_ok && e_ok)

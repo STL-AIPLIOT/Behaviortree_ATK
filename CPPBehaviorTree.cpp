@@ -281,7 +281,22 @@ void UCPPBehaviorTree::init()
 	{
 		if (envPath[0] != '\0') { rulePath = envPath; }
 	}
-	if (BtDiagEnabled()) { BtDiag("[init] rule xml = " + rulePath); }
+	if (BtDiagEnabled())
+	{
+		/*
+		[A/계측 2026-08-19] 경로만으로는 "어느 XML 이 실제로 읽혔는가" 를 못 가린다.
+		v3p 에서 우리 XML(8,404 B) 대신 5,947 B 짜리 옛 파일이 읽힌 사고가 있었는데,
+		경로 문자열은 정상으로 보였다. 같은 이름의 다른 파일이었기 때문이다.
+		크기를 함께 남겨 파일 동일성을 바로 판별한다.
+		*/
+		std::streamoff xml_bytes = -1;
+		{
+			std::ifstream probe(rulePath, std::ios::binary | std::ios::ate);
+			if (probe.is_open()) { xml_bytes = probe.tellg(); }
+		}
+		BtDiag("[init] rule xml = " + rulePath +
+			"  bytes=" + (xml_bytes >= 0 ? std::to_string(xml_bytes) : std::string("(열기 실패)")));
+	}
 	tree = Factory.createTreeFromFile(rulePath);
 
 	// 트리가 실제로 만들어졌는지 (노드 개수 포함) 파일로 남긴다.

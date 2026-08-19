@@ -190,6 +190,16 @@ public:
 	bool IsEnergyInferior;									//energy 비교 변수
 	int EnergyCompareResult;  // -1: 열세, 0: 같음, +1: 우세
 
+	/*
+	비에너지 차 [m]. (E_own - E_tgt) / 2g 로, "내가 적기보다 몇 미터만큼 높은 에너지에
+	있는가" 를 고도 단위로 읽는 값이다. E = v^2/2g + h.
+
+	EnergyCompareResult 는 히스테리시스를 거친 -1/0/+1 부호뿐이라 "얼마나" 를 알 수 없다.
+	OBFM 진입의 에너지 완화 조건(dE >= -300m)과 티어 매트릭스의 E+/E0/E- 밴드는 크기가
+	필요하므로 원시 차이를 그대로 남긴다. 부호만 쓰는 기존 소비자는 영향받지 않는다.
+	*/
+	float SpecificEnergyDelta_M;
+
 	bool IsCounterAttack; // DBFM 반격
 
 	Vector3 PredictedTargetVelocity;  // PredictManeuver 추가 로직

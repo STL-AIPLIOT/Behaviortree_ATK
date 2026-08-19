@@ -1,4 +1,5 @@
 #include "SetBFMMode_OBFM.h"
+#include "../STIL_Tuning.h"
 #include "../BTLog.h"
 #include <algorithm>
 
@@ -20,6 +21,10 @@ namespace Action {  // ★ 추가
         const bool e_sup = (BB->EnergyCompareResult > 0);
         const float AA = BB->MyAspectAngle_Degree;
         const float D = BB->Distance;
+        // ATA = 내 기수가 표적을 향한 각. CheckSight.cpp:39 가 채운다.
+        const float ATA = BB->Los_Degree;
+        // dE = (E_own - E_tgt)/2g [m]. EnergyCompare.cpp 가 채운다.
+        const float dE  = BB->SpecificEnergyDelta_M;
 
         /*
         [수정 2026-08-17] AA 규약 불일치 - 진입 조건이 정반대로 걸려 있었다.
@@ -41,20 +46,57 @@ namespace Action {  // ★ 추가
 
         OBFM = 내가 적기 후방 반구를 잡은 상태 -> AA 가 180 에 가까워야 한다.
         */
-        const bool aa_ok = (AA > 145.0f);
-        const bool dist_ok = (D >= 150.0f && D <= 1500.0f);  // [회전1.5] 하한 400->150: WEZ_MIN_M(152.4m) 아래로 내려 유효 사격 구간 전체에서 OBFM 지원 유지
+        /*
+        [C/v4 2026-08-19] 진입 게이트를 AA 축에서 ATA 축으로 교체한다.
 
-        if (sight && e_sup && aa_ok && dist_ok) {
+        왜 AA 를 버리는가 - 2026-08-18 진단 로그 실측:
+        sight && 150<=D<=1500 인 5,051 tick 중 AA>145 는 0.00% 였다.
+        원거리에서는 한쪽이 상대 뒤를 잡지만(AA~180) 1500m 안으로 들어오면 항상
+        정면이 된다. "공격 각도"와 "근거리"가 구조적으로 공존하지 않으므로
+        AA 기반 진입은 어떤 임계로도 성립하지 않는다.
+        ATA(내 기수가 표적을 향한 각)는 접근 구간에서도 유효하다.
+
+        에너지는 차단이 아니라 완화 조건이다. e_sup 필수 조건을 제거한다.
+        자기대전에서 두 기체 에너지는 사실상 같아 부호가 계속 뒤집히고,
+        열세인 쪽은 영원히 OBFM 에 못 들어갔다. 대신 dE 크기를 보되
+        근접(600m)에서는 열세여도 진입한다 - 그 거리에서 물러나는 것이 더 위험하다.
+
+        구식 복원: STIL_OBFM_LEGACY_GATE=1
+        */
+        if (STIL::ObfmLegacyGate())
+        {
+            const bool aa_ok_legacy = (AA > 145.0f);
+            const bool dist_ok_legacy = (D >= 150.0f && D <= 1500.0f);
+            if (sight && e_sup && aa_ok_legacy && dist_ok_legacy) {
+                BB->BFM = OBFM;
+                BT_VLOG("[SetBFMMode_OBFM] t=" << BB->MatchTimeSec()
+                    << "s | Enter OBFM (legacy) AA=" << AA << ", D=" << D << "\n");
+                return BT::NodeStatus::SUCCESS;
+            }
+            BT_VLOG("[SetBFMMode_OBFM] t=" << BB->MatchTimeSec()
+                << "s | Blocked(legacy): sight=" << sight << ", e_sup=" << e_sup
+                << ", AA=" << AA << ", D=" << D << "\n");
+            return BT::NodeStatus::FAILURE;
+        }
+
+        const bool dist_ok   = (D >= STIL::ObfmDMin() && D <= STIL::ObfmDMax());
+        const bool ata_ok    = (ATA <= STIL::ObfmAtaMax());
+        // 에너지 열세여도 근접이면 통과시킨다.
+        const bool energy_ok = (dE >= STIL::ObfmDeMin()) || (D <= STIL::ObfmDClose());
+
+        if (sight && dist_ok && ata_ok && energy_ok) {
             BB->BFM = OBFM;
-            BT_VLOG("[SetBFMMode_OBFM] t=" << BB->MatchTimeSec() << "s | Enter OBFM (AA=" << AA
-                << ", D=" << D << ", EnergySup=" << e_sup << ")\n");
+            BT_VLOG("[SetBFMMode_OBFM] t=" << BB->MatchTimeSec() << "s | Enter OBFM (ATA=" << ATA
+                << ", D=" << D << ", dE=" << dE << ")\n");
             return BT::NodeStatus::SUCCESS;
         }
 
+        // 어느 축에서 탈락했는지 남긴다 - 단계별 실험의 귀속에 쓴다.
         BT_VLOG("[SetBFMMode_OBFM] t=" << BB->MatchTimeSec() << "s | Blocked: sight=" << sight
-            << ", e_sup=" << e_sup
-            << ", AA=" << AA
-            << ", D=" << D << "\n");
+            << ", dist_ok=" << dist_ok
+            << ", ata_ok=" << ata_ok
+            << ", energy_ok=" << energy_ok
+            << " | ATA=" << ATA << ", AA=" << AA << ", D=" << D << ", dE=" << dE << "\n");
         return BT::NodeStatus::FAILURE;
     }
 

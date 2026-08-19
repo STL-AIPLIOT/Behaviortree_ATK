@@ -52,7 +52,7 @@
                 <!-- 우선권은 매 tick 이 체크가 재평가해 유지한다. Task 가 RUNNING 을 -->
                 <!-- 돌려주는 방식이 아니다 - SyncActionNode 는 RUNNING 에서 예외를 던진다. -->
                 <Sequence name="GroundAvoidance_Branch">
-                    <DECO_AltitudeCheck BB="{BB}" UpDown="Less" Altitude="450"/>
+                    <DECO_AltitudeCheck BB="{BB}" UpDown="Less" Altitude="1200"/>
                     <Task_ClimbToSafeAltitude BB="{BB}"/>
                 </Sequence>
 

@@ -114,6 +114,8 @@ namespace Action
         static constexpr float THR_ALLOUT_BASE = 0.95f;
         static constexpr float THR_PURSUE_BASE = 0.85f;
         static constexpr float THR_CONSERVE_BASE = 0.55f;
+        // [D-1/v4] CONSERVE + 에너지 우세에서 VP 를 이만큼 올려 위치에너지를 쌓는다 [m].
+        static constexpr float CONSERVE_CLIMB_M = 200.0f;
         static constexpr float THR_YOYO_BASE = 0.45f;
         static constexpr float THR_HEADON_COMMIT = 0.90f;
         static constexpr float THR_CLOSURE_GAIN = 0.02f;    // 접근률 초과분 1 m/s 당 스로틀 감소
@@ -145,9 +147,24 @@ namespace Action
         };
 
         static const char* TierName(Tier t);
+        // dE [m] -> "E+" / "E0" / "E-" (경계 STIL_ENERGY_BAND, 기본 150m)
+        static const char* EnergyBandName(float dE_m);
+
+        // 에너지 축. 경계는 STIL_ENERGY_BAND(기본 +-150m).
+        enum EnergyBand { E_LOW = -1, E_MID = 0, E_HIGH = 1 };
+        static EnergyBand BandOf(float dE_m);
 
         // 히스테리시스용. 버퍼 구간(2.5~3.0 deg)에서는 직전 티어를 유지해 채터링을 막는다.
         // 담당 상황을 벗어나(FAILURE) 다시 들어올 때는 보수적으로 시작한다.
         Tier prev_tier_ = TIER_CONSERVE;
+
+        /*
+        [D-1/v4] ALL_OUT 을 에너지 열세(E-)로 유지하기 시작한 시각 [s].
+        음수면 "지금 그 상태가 아님". MatchTimeSec() 기준이다 - wall-clock 을 쓰면
+        경기 속도가 바뀔 때 상한이 달라진다.
+        연속 STIL_ALLOUT_ELOW_MAX_S 를 넘기면 CONSERVE 로 강등한다: 열세에서
+        무한정 밀어붙이면 에너지가 바닥나 회복 불가가 된다.
+        */
+        double allout_elow_since_ = -1.0;
     };
 }

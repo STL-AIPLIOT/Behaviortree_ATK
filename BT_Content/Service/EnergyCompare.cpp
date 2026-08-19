@@ -83,6 +83,18 @@ namespace Action
 		(*BB)->IsEnergySuperior = (result > 0);
 		(*BB)->IsEnergyInferior = (result < 0);
 
+		/*
+		[A/계측 2026-08-19] 부호뿐 아니라 크기도 남긴다.
+
+		myEnergy/targetEnergy 는 v^2 + 2gh 단위이므로 2g 로 나누면 비에너지 고도 [m] 가
+		된다 — "내가 적기보다 몇 미터 높은 에너지에 있는가". OBFM 진입의 에너지 완화
+		조건(dE >= -300m)과 티어 매트릭스의 E+/E0/E- 밴드가 이 크기를 쓴다.
+
+		히스테리시스를 거치지 않은 원시 차이다. 밴드 판정을 소비자 쪽에서 하도록 두어,
+		EnergyCompareResult 의 데드밴드(100m)와 티어 밴드(150m)가 서로 간섭하지 않게 한다.
+		*/
+		(*BB)->SpecificEnergyDelta_M = diff / (2.0f * g);
+
 		return NodeStatus::SUCCESS;
 	}
 }

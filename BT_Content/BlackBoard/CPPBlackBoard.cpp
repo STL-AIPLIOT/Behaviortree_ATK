@@ -56,6 +56,7 @@ CPPBlackBoard::CPPBlackBoard()
 	Team = UNKNOWN;
 
 	EnergyCompareResult = 0;
+	SpecificEnergyDelta_M = 0.0f;
 
 	PredictedTargetVelocity = Vector3(0, 0, 0);
 

@@ -145,6 +145,8 @@ namespace Action
         };
 
         static const char* TierName(Tier t);
+        // dE [m] -> "E+" / "E0" / "E-" (경계 STIL_ENERGY_BAND, 기본 150m)
+        static const char* EnergyBandName(float dE_m);
 
         // 히스테리시스용. 버퍼 구간(2.5~3.0 deg)에서는 직전 티어를 유지해 채터링을 막는다.
         // 담당 상황을 벗어나(FAILURE) 다시 들어올 때는 보수적으로 시작한다.

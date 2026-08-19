@@ -1,6 +1,7 @@
 #include "Task_AggressiveOBFM.h"
 #include "../BTLog.h"
 #include "../WezPhase.h"
+#include "../STIL_Tuning.h"
 
 #include <algorithm>
 #include <cmath>
@@ -89,7 +90,9 @@ namespace Action
                     {
                         out << "t,mode,tier,D,ata_deg,aa_nose_deg,ao_deg,closure_ms,"
                             "my_spd_ms,tgt_spd_ms,ecmp,round,throttle,gun_window,"
-                            "wez_phase,gun_coeff,vp_x,vp_y,vp_z\n";
+                            "wez_phase,gun_coeff,vp_x,vp_y,vp_z,"
+                            // [A/계측] 기존 컬럼명은 그대로 두고 뒤에만 추가한다.
+                            "dE_m,energy_band\n";
                         out.flush();
                     }
                 }
@@ -124,6 +127,18 @@ namespace Action
         case TIER_CONSERVE: return "CONSERVE";
         }
         return "?";
+    }
+
+    /*
+    dE 밴드 이름. 티어 매트릭스의 에너지 축과 CSV 의 energy_band 컬럼이 같은
+    경계를 쓰도록 한 곳에서 판정한다. 경계는 STIL_ENERGY_BAND(기본 150m).
+    */
+    const char* Task_AggressiveOBFM::EnergyBandName(float dE_m)
+    {
+        const float band = STIL::EnergyBand();
+        if (dE_m >  band) { return "E+"; }
+        if (dE_m < -band) { return "E-"; }
+        return "E0";
     }
 
     BT::NodeStatus Task_AggressiveOBFM::tick()
@@ -398,7 +413,9 @@ namespace Action
             row += std::to_string(gun_coeff);       row += ",";
             row += std::to_string(BB->VP_Cartesian.X); row += ",";
             row += std::to_string(BB->VP_Cartesian.Y); row += ",";
-            row += std::to_string(BB->VP_Cartesian.Z);
+            row += std::to_string(BB->VP_Cartesian.Z); row += ",";
+            row += std::to_string(BB->SpecificEnergyDelta_M); row += ",";
+            row += EnergyBandName(BB->SpecificEnergyDelta_M);
             csv.Row(row);
         }
 

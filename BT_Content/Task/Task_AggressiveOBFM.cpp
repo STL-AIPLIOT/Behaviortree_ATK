@@ -141,6 +141,14 @@ namespace Action
         return "E0";
     }
 
+    Task_AggressiveOBFM::EnergyBand Task_AggressiveOBFM::BandOf(float dE_m)
+    {
+        const float band = STIL::EnergyBand();
+        if (dE_m >  band) { return E_HIGH; }
+        if (dE_m < -band) { return E_LOW; }
+        return E_MID;
+    }
+
     BT::NodeStatus Task_AggressiveOBFM::tick()
     {
         auto bb_res = getInput<CPPBlackBoard*>("BB");
@@ -275,6 +283,7 @@ namespace Action
             //    2.5~3.0 deg 버퍼 구간에서는 직전 티어를 유지한다.
             // -----------------------------------------------------------
             // 임계는 현재 열린 대미지 창의 폭에 비례한다(Phase 1 = 배율 1.0, 종전과 동일).
+            const EnergyBand band = BandOf(BB->SpecificEnergyDelta_M);
             const float allout_ata = ALLOUT_ATA * phase_scale;
             const float tier_up_ata = TIER_UP_ATA * phase_scale;
             const float tier_down_ata = TIER_DOWN_ATA * phase_scale;
@@ -283,6 +292,39 @@ namespace Action
             else if (ata <= tier_up_ata)    tier = TIER_PURSUE;    // 좁혀지면 상승
             else if (ata >= tier_down_ata)  tier = TIER_CONSERVE;  // 벌어지면 하강
             else                            tier = prev_tier_;     // 버퍼 구간
+
+            /*
+            [D-1/v4] 에너지 축. ATA 로 정한 티어를 dE 밴드로 보정한다.
+
+            ATA 단독 티어는 "각이 좋으니 밀어붙인다" 만 볼 뿐 그럴 에너지가 있는지를
+            보지 않는다. 열세인데 ALL_OUT 을 계속 물면 선회로 에너지를 태워 회복
+            불가가 된다. 여기서 연속 유지 시간에 상한을 걸고, CONSERVE 쪽은 반대로
+            에너지를 되사는 방향(상승/감속)으로 민다.
+
+            STIL_TIER_MATRIX=0 이면 이 블록 전체를 건너뛰어 ATA 단독 티어로 되돌아간다.
+            */
+            if (STIL::TierMatrix())
+            {
+                if (tier == TIER_ALL_OUT && band == E_LOW)
+                {
+                    if (allout_elow_since_ < 0.0) { allout_elow_since_ = match_t; }
+                    const double held = match_t - allout_elow_since_;
+                    if (held > static_cast<double>(STIL::AllOutELowMaxSec()))
+                    {
+                        tier = TIER_CONSERVE;   // 강등. 에너지를 되사러 간다.
+                        BT_VLOG("[Task_AggressiveOBFM] ALL_OUT(E-) " << held
+                            << "s 초과 -> CONSERVE 강등\n");
+                    }
+                }
+                else
+                {
+                    allout_elow_since_ = -1.0;   // 조건이 끊기면 타이머 리셋
+                }
+            }
+            else
+            {
+                allout_elow_since_ = -1.0;
+            }
 
             switch (tier)
             {
@@ -298,17 +340,31 @@ namespace Action
             {
                 // 공격적 리드로 각을 빠르게 죽인다. 리드점을 기수 기준 횡방향으로 더 밀어
                 // 컨트롤러가 더 강한 선회를 물게 한다(TURN_IN_BIAS).
+                /*
+                [D-1/v4] 에너지 축 보정.
+                  E+ : 리드를 더 당긴다(여유가 있으니 각을 빨리 죽인다)
+                  E0 : 표준
+                  E- : 리드를 약화하고 스로틀을 0.1 낮춘다(G 를 덜 먹는다)
+                */
+                float lead_mul = 1.0f;
+                float thr_bias = 0.0f;
+                if (STIL::TierMatrix())
+                {
+                    if (band == E_HIGH) { lead_mul = 1.25f; }
+                    else if (band == E_LOW) { lead_mul = 0.75f; thr_bias = 0.10f; }
+                }
+
                 Vector3 to_lead = (BB->TargetLocaion_Cartesian
-                    + Vt * static_cast<double>(t_flight * PURSUE_LEAD_GAIN))
+                    + Vt * static_cast<double>(t_flight * PURSUE_LEAD_GAIN * lead_mul))
                     - BB->MyLocation_Cartesian;
                 Vector3 perp = to_lead - fwd * Dot(to_lead, fwd);   // 기수에 수직인 성분 = 선회해야 할 방향
 
                 vp = BB->MyLocation_Cartesian + to_lead;
                 if (perp.lengthSquared() > 1e-6)
                 {
-                    vp = vp + Normalized(perp) * static_cast<double>(TURN_IN_BIAS);
+                    vp = vp + Normalized(perp) * static_cast<double>(TURN_IN_BIAS * lead_mul);
                 }
-                thr = clampf(THR_PURSUE_BASE - THR_CLOSURE_GAIN * closure_err, 0.55f, 1.0f);
+                thr = clampf(THR_PURSUE_BASE - thr_bias - THR_CLOSURE_GAIN * closure_err, 0.45f, 1.0f);
                 mode = "PURSUE";
                 break;
             }
@@ -344,14 +400,38 @@ namespace Action
                 }
                 else
                 {
+                    mode = "";   // 아래 에너지 축 보정이 이름을 정한다
                     const Vector3 vt_dir = Normalized(Vt);
                     vp = BB->TargetLocaion_Cartesian;
                     if (vt_dir.lengthSquared() > 0.5)
                     {
                         vp = vp - vt_dir * static_cast<double>(lag);   // 표적 뒤쪽 = lag pursuit
                     }
-                    thr = clampf(base - THR_CLOSURE_GAIN * closure, 0.30f, 0.75f);
-                    mode = "CONSERVE";
+                    /*
+                    [D-1/v4] 에너지 축 보정.
+                      E+ : VP 를 위로 올려 위치에너지를 쌓는다(속도 여유를 고도로 저금)
+                      E0 : 완만한 lag (현행)
+                      E- : 코너속도까지 감속. 스로틀 하한을 STIL_CONSERVE_THR_FLOOR
+                           까지 내려 선회율을 산다. 상시 전출력이라 선회반경이
+                           1,233m 나 되던 것이 이 트리의 핵심 문제였다.
+                    */
+                    float thr_lo = 0.30f;
+                    if (STIL::TierMatrix())
+                    {
+                        if (band == E_HIGH)
+                        {
+                            vp.Z += static_cast<double>(CONSERVE_CLIMB_M);
+                            mode = "CONSERVE_CLIMB";
+                        }
+                        else if (band == E_LOW)
+                        {
+                            thr_lo = STIL::ConserveThrFloor();
+                            base = std::min(base, thr_lo + 0.10f);
+                            mode = "CONSERVE_SLOW";
+                        }
+                    }
+                    thr = clampf(base - THR_CLOSURE_GAIN * closure, thr_lo, 0.75f);
+                    if (mode[0] == '\0') { mode = "CONSERVE"; }
                 }
                 break;
             }

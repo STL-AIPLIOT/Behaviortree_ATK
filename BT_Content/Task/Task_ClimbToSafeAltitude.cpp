@@ -1,4 +1,5 @@
 #include "Task_ClimbToSafeAltitude.h"
+#include "../STIL_Tuning.h"
 #include "../BTLog.h"
 #include <algorithm>
 #include <cmath>
@@ -75,6 +76,41 @@ namespace Action {
         const float spd = std::max(50.0f, BB->MySpeed_MS); // 안전 하한
         const float ahead = clampf(150.0f + 1.2f * spd, 200.0f, 600.0f);
         const float climb = clampf(200.0f + 0.6f * spd, 250.0f, 800.0f);
+
+        /*
+        [E/v4 2026-08-19] 뱅크가 크면 상승 VP 를 찍기 전에 롤 수평화를 먼저 한다.
+
+        고뱅크에서는 양력 벡터가 옆(또는 인버티드면 아래)을 향한다. 그 상태로
+        "위쪽" VP 를 주면 기체는 위로 가지 못하고 선회만 하다가 고도를 더 잃는다.
+        회복의 물리적 순서는 (1) 양력 벡터를 위로 되돌리고 (2) 당기는 것이다.
+
+        수평화 VP: 현재 고도의 수평 전방. 상승 성분을 주지 않는 것이 핵심이다 -
+        상승을 함께 요구하면 컨트롤러가 뱅크를 유지한 채 당겨 다시 같은 문제가 된다.
+        스로틀은 유지해 속도를 지킨다(속도를 잃으면 회복 자체가 안 된다).
+
+        MyRotation_EDegree 는 Degree 단위다(CPPBlackBoard.h:155).
+        구식 복원: STIL_ROLL_LEVEL_FIRST=0
+        */
+        float roll_deg = static_cast<float>(BB->MyRotation_EDegree.Roll);
+        while (roll_deg > 180.0f)  { roll_deg -= 360.0f; }
+        while (roll_deg < -180.0f) { roll_deg += 360.0f; }
+        const bool bank_too_much =
+            STIL::RollLevelFirst() && (std::fabs(roll_deg) > STIL::RollLevelMaxBank());
+
+        if (bank_too_much)
+        {
+            Vector3 level_vp = myPos + fwd_h * ahead;
+            level_vp.Z = myPos.Z;            // 수평. 상승 성분을 주지 않는다.
+            BB->VP_Cartesian = level_vp;
+            BB->Throttle = 1.0f;
+            BB->BFM = NONE;                  // 회복 중 다른 BFM 진입 차단
+
+            BT_VLOG("[Task_ClimbToSafeAltitude] ROLL_LEVEL"
+                << " | roll=" << roll_deg
+                << " curZ=" << curZ
+                << " (뱅크 제거 우선, 상승은 다음 tick)\n");
+            return NodeStatus::SUCCESS;
+        }
 
         // ---- 목표점: "수평 전방 + 순수 상승" → Z는 언제나 증가 ----
         Vector3 vp = myPos + fwd_h * ahead + world_up * climb;

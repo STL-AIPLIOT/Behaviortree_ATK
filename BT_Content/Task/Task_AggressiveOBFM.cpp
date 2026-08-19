@@ -238,7 +238,22 @@ namespace Action
         // 건 리드점: 유효 탄속(내 속도 + K_MUZZLE)으로 비행시간을 만들고 그만큼 앞을 찍는다.
         const float t_flight = clampf(D / std::max(1.0f, BB->MySpeed_MS + K_MUZZLE),
             LEAD_TIME_MIN_SEC, LEAD_TIME_MAX_SEC);
-        const Vector3 lead_point = BB->TargetLocaion_Cartesian + Vt * static_cast<double>(t_flight);
+        /*
+        [D-2/v4] 정면 상황에서는 리드점을 쓰지 않는다.
+
+        리드점은 표적이 "지나갈" 자리를 찍는 것이다. 표적 속도 벡터가 나를 향하는
+        정면에서는 그 자리가 나와 표적 사이에 놓인다 - 측정된 사례에서 오프셋 511m,
+        표적에서 27.4도 이탈이었다. 그 점을 물면 표적이 아니라 허공을 쫓는다.
+
+        판정: 표적 기수와 "표적->나" 벡터의 사잇각(aa_nose)이 작으면 정면이다.
+        이때는 리드 없이 표적 자체를 문다(pure pursuit).
+        구식 복원: STIL_LEAD_HEADON_GUARD=0
+        */
+        const bool head_on_no_lead =
+            STIL::LeadHeadOnGuard() && (aa_nose <= STIL::LeadHeadOnDeg());
+        const Vector3 lead_point = head_on_no_lead
+            ? BB->TargetLocaion_Cartesian
+            : BB->TargetLocaion_Cartesian + Vt * static_cast<double>(t_flight);
 
         // 스위트 거리 안이면 접근률 0 을, 밖이면 CLOSURE_TARGET_MS 를 원한다.
         const float closure_want = (D > D_SWEET_AGGR) ? CLOSURE_TARGET_MS : 0.0f;
@@ -467,7 +482,16 @@ namespace Action
         //    STIL_WEZ_MODE=training 을 주면 학습 환경 update_damage() 와 동일한 고정 창으로
         //    되돌아가므로, 이전 판과 같은 잣대로 비교해야 할 때 그쪽을 쓴다.
         // ---------------------------------------------------------------
-        const float gun_coeff = WezPhase::BestCoeff(match_t, ata, D);
+        /*
+        [D-2/v4] 사거리 밖에서는 사격 판정 자체를 시도하지 않는다.
+
+        WezPhase 의 최대 사거리는 Phase 3 에서 4000ft(1219m)까지 늘어나지만,
+        계수가 0.1 이라 실효 대미지가 거의 없다. 그런데 gun_window 가 1 로 서면
+        로그·집계에서 "사격 자세를 잡았다" 로 읽혀 지표가 부풀려진다.
+        3000ft(914.4m, STIL_GUN_MAX_RANGE) 밖은 접근·각 만들기 구간으로 본다.
+        */
+        const bool in_gun_range = (D <= STIL::GunMaxRange());
+        const float gun_coeff = in_gun_range ? WezPhase::BestCoeff(match_t, ata, D) : 0.0f;
         const bool gun_window = (gun_coeff > 0.0f);
 
         AggrCsv& csv = AggrCsv::Instance();

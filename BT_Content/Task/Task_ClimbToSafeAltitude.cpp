@@ -50,7 +50,9 @@ namespace Action {
         450m 는 추락선 300m 위로 150m 여유이고, 어떤 초기 배치 고도보다도 낮다.
         급강하 방어는 DECO_AltitudeCheck 의 3초 예측이 맡는다(같은 커밋).
         */
-        const float kFloor = 450.0f;
+        // [F/v4] 값은 STIL_Tuning.h 로 옮겼다. Rule.xml 의 DECO_AltitudeCheck
+        // Altitude 와 항상 같아야 하며, 둘 다 STIL_GROUND_FLOOR_M 으로 덮인다.
+        const float kFloor = STIL::GroundFloorM();
         const float margin = 200.0f;
         const float curZ = float(myPos.Z);
 

@@ -1,4 +1,5 @@
 #include "DECO_AltitudeCheck.h"
+#include "../STIL_Tuning.h"
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
@@ -45,6 +46,16 @@ namespace Action {
                 << altO.value() << "'\n";
             return NodeStatus::FAILURE;
         }
+
+        /*
+        [F/v4] STIL_GROUND_FLOOR_M 이 있으면 XML 값 대신 그것을 쓴다.
+
+        이 임계는 Task_ClimbToSafeAltitude 의 kFloor 와 반드시 같아야 하는데,
+        한쪽은 XML 포트고 다른 쪽은 C++ 상수라 따로 고치다 어긋나기 쉬웠다.
+        env 를 주면 두 곳이 같은 값을 읽으므로 재빌드도 XML 수정도 필요 없다.
+        제출 전 하향(1200 -> 450)도 env 하나로 끝난다.
+        */
+        targetAlt = STIL::GroundFloorM();
 
         // 현재 고도
         const float Z = static_cast<float>(BB->MyLocation_Cartesian.Z);

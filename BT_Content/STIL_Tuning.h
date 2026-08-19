@@ -90,6 +90,23 @@ namespace STIL
     inline float LeadHeadOnDeg()      { return STIL_TUNABLE_F("STIL_LEAD_HEADON_DEG", 30.0); }
     inline bool  LeadHeadOnGuard()    { return STIL_TUNABLE_ON("STIL_LEAD_HEADON_GUARD", true); }
 
+    // ---- F. 지면 회피 개시 고도 --------------------------------------------
+    /*
+    회피를 시작할 고도 [m]. Rule.xml 의 DECO_AltitudeCheck Altitude 와
+    Task_ClimbToSafeAltitude 의 kFloor 가 **같은 값**이어야 한다.
+    env 를 주면 둘 다 그 값을 쓰므로 XML 을 고치지 않고 바꿀 수 있다.
+
+    실험 기간 1200: 450 에서는 추락선(300m)까지 0.42~1.55초뿐이라 회피 로직이
+    작동해도 시간이 모자라 추락한다(지면 충돌 15판 분석, 유형 A 10판).
+    1200 이면 2.53~9.28초가 확보돼 추락을 배제한 채 조준 로직을 판정할 수 있다.
+
+    TODO(제출 전): 1200 은 로컬 초기고도 7000m 전제다. 규정 §5 대회 초기 배치는
+    약 610~914m 라 1200 이면 경기 시작 순간부터 지면 회피가 Fallback 최상단을
+    점유해 SCISSORS/HABFM/OBFM/DBFM 이 한 번도 실행되지 않는다.
+    제출본은 450 으로 내리거나 STIL_GROUND_FLOOR_M=450 을 준다.
+    */
+    inline float GroundFloorM()       { return STIL_TUNABLE_F("STIL_GROUND_FLOOR_M", 1200.0); }
+
     // ---- E. 지면 회피 롤 수평화 --------------------------------------------
     // 0 이면 현행(즉시 상승 VP)으로 되돌린다.
     inline bool  RollLevelFirst()     { return STIL_TUNABLE_ON("STIL_ROLL_LEVEL_FIRST", true); }

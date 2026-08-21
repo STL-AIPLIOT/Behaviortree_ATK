@@ -1,5 +1,6 @@
 #include "SetBFMMode_SCISSORS.h"
 #include "../BTLog.h"
+#include "../STIL_Tuning.h"
 #include <iostream>
 #include <algorithm>
 
@@ -19,10 +20,11 @@ BT::NodeStatus SetBFMMode_SCISSORS::tick()
     const float D = BB->Distance;
     const int   ecmp = BB->EnergyCompareResult;
 
-    bool cond = sight &&
-        (los >= 10.0f && los <= 45.0f) &&
-        (D >= 150.0f && D <= 800.0f) &&
-        (ecmp <= 0);
+    // 공격 허용 구간을 더 좁혀서 스키살이 공격 루트 대신 사격 기회를 뺏지 않게 한다.
+    const bool cond = sight &&
+        (D >= 300.0f && D <= 550.0f) &&
+        (los >= 20.0f && los <= 30.0f) &&
+        (ecmp <= -1);
 
     if (cond) {
         BB->BFM = SCISSORS;

@@ -82,38 +82,39 @@ namespace Action
         static constexpr bool ALLOW_EXTEND = false;
 
         // ================= 튜닝 상수 (지정값) =================
-        static constexpr float D_SWEET_AGGR = 300.0f;   // 공격형이 유지하려는 거리 [m]
+        static constexpr float D_SWEET_AGGR = 250.0f;   // 공격형이 유지하려는 거리 [m]
         static constexpr float OVERSHOOT_CLOSURE = 18.0f;    // 하이 요요 발동 접근률 [m/s]
-        static constexpr float OVERSHOOT_D = 350.0f;   // 하이 요요 발동 거리 [m]
-        static constexpr float H_YOYO = 180.0f;   // 하이 요요 수직 오프셋 [m]
+        static constexpr float OVERSHOOT_D = 500.0f;   // 하이 요요 발동 거리 [m]
+        static constexpr float H_YOYO = 200.0f;   // 하이 요요 수직 오프셋 [m]
         // [회전3] 요요 오프셋이 가져야 할 최소 월드 상방 성분(단위벡터 Z). 약 20도.
         // 나이프에지(동체 up 이 수평)에서 수직 성분이 0 이 되는 것을 막는다.
         static constexpr double YOYO_MIN_UP_Z = 0.35;
-        static constexpr float K_MUZZLE = 300.0f;   // lead 비행시간 계산용 유효 탄속 가산 [m/s]
-        static constexpr float TURN_IN_BIAS = 180.0f;   // PURSUE 에서 리드점을 더 당기는 횡방향 바이어스 [m]
-        static constexpr float ALLOUT_ATA = 1.5f;     // ALL_OUT 진입 ATA [deg]
-        static constexpr float TIER_UP_ATA = 2.5f;     // 티어 상승 임계 [deg]
-        static constexpr float TIER_DOWN_ATA = 3.0f;     // 티어 하강 임계 [deg]
+        static constexpr float K_MUZZLE = 320.0f;   // lead 비행시간 계산용 유효 탄속 가산 [m/s]
+        static constexpr float TURN_IN_BIAS = 220.0f;   // PURSUE 에서 리드점을 더 당기는 횡방향 바이어스 [m]
+        static constexpr float ALLOUT_ATA = 1.3f;     // ALL_OUT 진입 ATA [deg]
+        static constexpr float TIER_UP_ATA = 2.2f;     // 티어 상승 임계 [deg]
+        static constexpr float TIER_DOWN_ATA = 2.8f;     // 티어 하강 임계 [deg]
 
         // ================= 진입 게이트 =================
         // 이 밖이면 FAILURE 로 양보한다. 위의 "왜 진입 게이트가 필요한가" 참조.
-        static constexpr float ENTRY_ATA_MAX_DEG = 60.0f;
+        static constexpr float ENTRY_ATA_MAX_DEG = 180.0f;
         static constexpr float ENTRY_D_MIN_M = 30.0f;
         static constexpr float ENTRY_D_MAX_M = 2500.0f;
 
         // ================= 파생 튜닝 상수 =================
-        static constexpr float LEAD_TIME_MIN_SEC = 0.2f;
-        static constexpr float LEAD_TIME_MAX_SEC = 2.0f;
-        static constexpr float PURSUE_LEAD_GAIN = 1.3f;     // PURSUE 는 리드를 조금 더 앞에 찍는다
-        static constexpr float CONSERVE_LAG_GAIN = 0.15f;    // 약한 lag = 거리의 15%
-        static constexpr float CONSERVE_LAG_MAX_M = 250.0f;   // lag 상한. 이 이상은 사실상 extend 다
-        static constexpr float R12_CONSERVE_LAG_MUL = 1.2f;     // R12: lag 를 더 줘 선회 G 를 낮춘다
+        static constexpr float LEAD_TIME_MIN_SEC = 0.05f;
+        static constexpr float LEAD_TIME_MAX_SEC = 0.7f;
+        static constexpr float PURSUE_LEAD_GAIN = 1.55f;     // PURSUE 는 리드를 더 앞에 찍어 공격 유지
+        static constexpr float CONSERVE_LAG_GAIN = 0.12f;    // 약한 lag = 거리의 12%
+        static constexpr float CONSERVE_LAG_MAX_M = 220.0f;   // lag 상한. 이 이상은 사실상 extend 다
+        static constexpr float E_CONSERVE_LAG_MUL_MAX = 1.1f; // 얇은 에너지일 때 lag 를 더 벌린다
+        static constexpr float R12_CONSERVE_LAG_MUL = E_CONSERVE_LAG_MUL_MAX; // R12 와 E- 가 같은 보수 패널티를 공유
         static constexpr float HEADON_AA_DEG = 60.0f;    // R3 정면 커밋 판정 (적기 기수 기준)
 
         // 스로틀
-        static constexpr float THR_ALLOUT_BASE = 0.95f;
-        static constexpr float THR_PURSUE_BASE = 0.85f;
-        static constexpr float THR_CONSERVE_BASE = 0.55f;
+        static constexpr float THR_ALLOUT_BASE = 0.98f;
+        static constexpr float THR_PURSUE_BASE = 0.90f;
+        static constexpr float THR_CONSERVE_BASE = 0.60f;
         // [D-1/v4] CONSERVE + 에너지 우세에서 VP 를 이만큼 올려 위치에너지를 쌓는다 [m].
         static constexpr float CONSERVE_CLIMB_M = 200.0f;
         static constexpr float THR_YOYO_BASE = 0.45f;
@@ -121,7 +122,7 @@ namespace Action
         static constexpr float THR_CLOSURE_GAIN = 0.02f;    // 접근률 초과분 1 m/s 당 스로틀 감소
         static constexpr float THR_ALLOUT_GAIN = 0.01f;    // ALL_OUT 은 절반만 반응(각을 놓치지 않는다)
         static constexpr float R12_CONSERVE_THR_BIAS = 0.05f;    // R12: CONSERVE 를 더 보수적으로
-        static constexpr float CLOSURE_TARGET_MS = 10.0f;    // 스위트 거리 밖에서 허용하는 접근률
+        static constexpr float CLOSURE_TARGET_MS = 12.0f;    // 스위트 거리 밖에서 허용하는 접근률
 
         // ================= WEZ (참고값) =================
         /*

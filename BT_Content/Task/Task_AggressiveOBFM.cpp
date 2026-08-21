@@ -269,7 +269,8 @@ namespace Action
         //    뒤로 빼지 않는다. 내 양력 벡터 방향(MyUpVector)으로 수직으로 빼서
         //    클로저만 죽이고 공격위치를 유지한다 = 하이 요요.
         // ---------------------------------------------------------------
-        const bool overshoot_risk = (closure > OVERSHOOT_CLOSURE) && (D < OVERSHOOT_D);
+        const bool overshoot_risk = (closure >= OVERSHOOT_CLOSURE) && (D < OVERSHOOT_D);
+        const bool gun_commit = (D <= 650.0f) && (ata <= 2.5f) && (WezPhase::BestCoeff(match_t, ata, D) > 0.0f);
 
         if (overshoot_risk)
         {
@@ -291,6 +292,20 @@ namespace Action
             mode = "HIGH_YOYO";
             // 티어 상태는 그대로 유지한다. 요요는 티어 전이가 아니라 덮어쓰기다.
         }
+        else if (gun_commit)
+        {
+            Vector3 turn_dir = Normalized(BB->TargetLocaion_Cartesian - BB->MyLocation_Cartesian);
+            const Vector3 to_target = BB->TargetLocaion_Cartesian - BB->MyLocation_Cartesian;
+            const Vector3 local = to_target - fwd * Dot(to_target, fwd);
+            if (local.lengthSquared() > 1e-6)
+            {
+                turn_dir = Normalized(local);
+            }
+            vp = lead_point + turn_dir * static_cast<double>(TURN_IN_BIAS * 1.5);
+            thr = clampf(THR_ALLOUT_BASE, 0.85f, 1.0f);
+            mode = "ALL_OUT";
+            prev_tier_ = TIER_ALL_OUT;
+        }
         else
         {
             // -----------------------------------------------------------
@@ -298,7 +313,20 @@ namespace Action
             //    2.5~3.0 deg 버퍼 구간에서는 직전 티어를 유지한다.
             // -----------------------------------------------------------
             // 임계는 현재 열린 대미지 창의 폭에 비례한다(Phase 1 = 배율 1.0, 종전과 동일).
-            const EnergyBand band = BandOf(BB->SpecificEnergyDelta_M);
+            // BB->SpecificEnergyDelta_M 가 비어 있거나 0 인 경우는 속도 간격을 추정해
+            // "얇은 에너지" 판정을 보정한다. 테스트/초기화 경로에서 값이 비어 있어도
+            // 적절히 보수적으로 동작하도록 한다.
+            float dE = BB->SpecificEnergyDelta_M;
+            EnergyBand band = BandOf(dE);
+            const bool energy_missing = (std::fabs(dE) < 1e-6f) || (BB->EnergyCompareResult < 0);
+            if (energy_missing && BB->MySpeed_MS > 0.0f && BB->TargetSpeed_MS > 0.0f)
+            {
+                const float rel = (BB->MySpeed_MS * BB->MySpeed_MS - BB->TargetSpeed_MS * BB->TargetSpeed_MS)
+                    / std::max(1.0f, BB->TargetSpeed_MS * BB->TargetSpeed_MS);
+                if (rel < 0.10f)      band = E_LOW;
+                else if (rel > 0.20f) band = E_HIGH;
+                else                  band = E_MID;
+            }
             const float allout_ata = ALLOUT_ATA * phase_scale;
             const float tier_up_ata = TIER_UP_ATA * phase_scale;
             const float tier_down_ata = TIER_DOWN_ATA * phase_scale;
@@ -320,7 +348,11 @@ namespace Action
             */
             if (STIL::TierMatrix())
             {
-                if (tier == TIER_ALL_OUT && band == E_LOW)
+                if (band == E_LOW && tier == TIER_PURSUE)
+                {
+                    tier = TIER_CONSERVE;
+                }
+                else if (tier == TIER_ALL_OUT && band == E_LOW)
                 {
                     if (allout_elow_since_ < 0.0) { allout_elow_since_ = match_t; }
                     const double held = match_t - allout_elow_since_;
@@ -347,6 +379,13 @@ namespace Action
             {
                 // 풀 리드 + 스로틀 상향. 1 deg 건 솔루션까지 밀어붙인다.
                 vp = lead_point;
+                if ((BB->PredictedTurnDirection == "LEFT") || (BB->PredictedTurnDirection == "RIGHT"))
+                {
+                    const Vector3 turn_dir = (BB->PredictedTurnDirection == "LEFT")
+                        ? -Normalized(BB->MyRightVector)
+                        : Normalized(BB->MyRightVector);
+                    vp = vp + turn_dir * static_cast<double>(TURN_IN_BIAS);
+                }
                 thr = clampf(THR_ALLOUT_BASE - THR_ALLOUT_GAIN * closure_err, 0.75f, 1.0f);
                 mode = "ALL_OUT";
                 break;
@@ -375,9 +414,15 @@ namespace Action
                 Vector3 perp = to_lead - fwd * Dot(to_lead, fwd);   // 기수에 수직인 성분 = 선회해야 할 방향
 
                 vp = BB->MyLocation_Cartesian + to_lead;
-                if (perp.lengthSquared() > 1e-6)
+                const bool has_turn_bias = (BB->PredictedTurnDirection == "LEFT") || (BB->PredictedTurnDirection == "RIGHT") || (perp.lengthSquared() > 1e-6);
+                if (has_turn_bias)
                 {
-                    vp = vp + Normalized(perp) * static_cast<double>(TURN_IN_BIAS * lead_mul);
+                    const Vector3 turn_dir = [&]() {
+                        if (BB->PredictedTurnDirection == "LEFT")  { return -Normalized(BB->MyRightVector); }
+                        if (BB->PredictedTurnDirection == "RIGHT") { return  Normalized(BB->MyRightVector); }
+                        return Normalized(perp);
+                    }();
+                    vp = vp + turn_dir * static_cast<double>(TURN_IN_BIAS * lead_mul);
                 }
                 thr = clampf(THR_PURSUE_BASE - thr_bias - THR_CLOSURE_GAIN * closure_err, 0.45f, 1.0f);
                 mode = "PURSUE";
@@ -393,11 +438,11 @@ namespace Action
                 float lag = clampf(CONSERVE_LAG_GAIN * D, 0.0f, CONSERVE_LAG_MAX_M);
                 float base = THR_CONSERVE_BASE;
 
-                if (round == ROUND_R12)
+                if (band == E_LOW)
                 {
-                    // 1·2R: 에너지 바닥을 존중해 더 보수적으로. lag 를 늘려 선회 G 를 낮춘다.
-                    lag = clampf(lag * R12_CONSERVE_LAG_MUL, 0.0f, CONSERVE_LAG_MAX_M);
-                    base -= R12_CONSERVE_THR_BIAS;
+                    // 에너지 열세일 때만 lag 와 스로틀을 더 보수적으로 잡아 안정성을 유지한다.
+                    lag = clampf(lag * E_CONSERVE_LAG_MUL_MAX, 0.0f, CONSERVE_LAG_MAX_M);
+                    base -= 0.10f;
                 }
 
                 const bool headon_commit =

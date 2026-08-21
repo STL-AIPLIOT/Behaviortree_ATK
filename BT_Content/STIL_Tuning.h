@@ -59,20 +59,38 @@ namespace STIL
         (STIL_TUNABLE(env_name, (default_on) ? 1.0 : 0.0) != 0.0)
 
     // ---- B. HABFM 진입창 --------------------------------------------------
-    // 사격 진입로(WEZ 152~914m 바로 바깥)를 비우기 위해 하한을 올린다.
+    // 사격 진입로(WEZ 152~914m 바로 바깥)를 비우기 위해 하한을 올리되,
+    // 과도한 보수는 공격 기회를 잃는다. 1200m 는 너무 높아 고급 공격 루프가 막힌다.
     // 구식 복원: STIL_HABFM_DMIN=800
-    inline float HabfmDMin()          { return STIL_TUNABLE_F("STIL_HABFM_DMIN", 1200.0); }
+    inline float HabfmDMin()          { return STIL_TUNABLE_F("STIL_HABFM_DMIN", 900.0); }
 
     // ---- C. OBFM 진입 게이트 ----------------------------------------------
     // AA 축을 제거하고 ATA + 거리 + 에너지 완화로 대체한다.
     // 구식 복원: STIL_OBFM_D_MAX=1500, STIL_OBFM_ATA_MAX=180(=사실상 무효화 후 AA 축 복원 필요)
-    inline float ObfmDMin()           { return STIL_TUNABLE_F("STIL_OBFM_D_MIN",  150.0); }
-    inline float ObfmDMax()           { return STIL_TUNABLE_F("STIL_OBFM_D_MAX", 2500.0); }
-    inline float ObfmAtaMax()         { return STIL_TUNABLE_F("STIL_OBFM_ATA_MAX", 60.0); }
-    inline float ObfmDeMin()          { return STIL_TUNABLE_F("STIL_OBFM_DE_MIN", -300.0); }
-    inline float ObfmDClose()         { return STIL_TUNABLE_F("STIL_OBFM_D_CLOSE", 600.0); }
+    inline float ObfmDMin()           { return STIL_TUNABLE_F("STIL_OBFM_D_MIN",  120.0); }
+    inline float ObfmDMax()           { return STIL_TUNABLE_F("STIL_OBFM_D_MAX", 2200.0); }
+    inline float ObfmAtaMax()         { return STIL_TUNABLE_F("STIL_OBFM_ATA_MAX", 55.0); }
+    inline float ObfmDeMin()          { return STIL_TUNABLE_F("STIL_OBFM_DE_MIN", -260.0); }
+    inline float ObfmDClose()         { return STIL_TUNABLE_F("STIL_OBFM_D_CLOSE", 500.0); }
+    inline float ObfmCloseDMax()      { return STIL_TUNABLE_F("STIL_OBFM_CLOSE_D_MAX", 1000.0); }
+    inline float ObfmCloseAtaMax()    { return STIL_TUNABLE_F("STIL_OBFM_CLOSE_ATA_MAX", 20.0); }
     // 1 이면 구식 게이트(AA>145 && EnergyCompareResult>0 필수)로 되돌린다.
     inline bool  ObfmLegacyGate()     { return STIL_TUNABLE_ON("STIL_OBFM_LEGACY_GATE", false); }
+
+    // ---- C-2. SCISSORS / DBFM 조건 ----------------------------------------
+    // SCISSORS 는 공격 기회를 빼앗는 분기이므로 세밀하게 제한한다.
+    // 구식 복원: STIL_SCISSORS_D_MIN=150, STIL_SCISSORS_LOS_MAX=45, STIL_SCISSORS_EC_MAX=0
+    inline float ScissorsDMin()       { return STIL_TUNABLE_F("STIL_SCISSORS_D_MIN", 250.0); }
+    inline float ScissorsDMax()       { return STIL_TUNABLE_F("STIL_SCISSORS_D_MAX", 650.0); }
+    inline float ScissorsLosMin()     { return STIL_TUNABLE_F("STIL_SCISSORS_LOS_MIN", 18.0); }
+    inline float ScissorsLosMax()     { return STIL_TUNABLE_F("STIL_SCISSORS_LOS_MAX", 35.0); }
+    inline int   ScissorsEnergyMax()  { return static_cast<int>(STIL_TUNABLE("STIL_SCISSORS_EC_MAX", -1.0)); }
+
+    // DBFM 는 방어/반격이 목적이므로 "상대가 6시 뒤에 있고" 우리 쪽이 위태로울 때만 들어간다.
+    inline float DbfmDMin()           { return STIL_TUNABLE_F("STIL_DBFM_D_MIN", 200.0); }
+    inline float DbfmDMax()           { return STIL_TUNABLE_F("STIL_DBFM_D_MAX", 1200.0); }
+    inline float DbfmLosMin()         { return STIL_TUNABLE_F("STIL_DBFM_LOS_MIN", 15.0); }
+    inline float DbfmAAEnterMin()     { return STIL_TUNABLE_F("STIL_DBFM_AA_ENTER_MIN", 120.0); }
 
     // ---- D. 티어 매트릭스 --------------------------------------------------
     // 0 이면 ATA 단독 티어(현행) 유지.

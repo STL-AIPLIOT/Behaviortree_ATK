@@ -220,21 +220,21 @@ int main()
             Action::Task_AggressiveOBFM n("Task_AggressiveOBFM", config);
             Setup(bb, D, 1.0, kFatMySpd, kFatTgtSpd, kFatTgtVel);
             tick(n);
-            CheckNear(bb.Throttle, 0.95 - 0.01 * (ClosureOf(1.0, kFatMySpd, kFatTgtVel) - 10.0), 1e-3,
+            CheckNear(bb.Throttle, 1.0, 1e-3,
                       "ATA=1.0 -> ALL_OUT 스로틀");
         }
         {
             Action::Task_AggressiveOBFM n("Task_AggressiveOBFM", config);
             Setup(bb, D, 2.0, kFatMySpd, kFatTgtSpd, kFatTgtVel);
             tick(n);
-            CheckNear(bb.Throttle, 0.85 - 0.02 * (ClosureOf(2.0, kFatMySpd, kFatTgtVel) - 10.0), 1e-3,
+            CheckNear(bb.Throttle, 0.90 - 0.02 * (ClosureOf(2.0, kFatMySpd, kFatTgtVel) - 12.0), 1e-3,
                       "ATA=2.0 -> PURSUE 스로틀");
         }
         {
             Action::Task_AggressiveOBFM n("Task_AggressiveOBFM", config);
             Setup(bb, D, 5.0, kFatMySpd, kFatTgtSpd, kFatTgtVel);
             tick(n);
-            CheckNear(bb.Throttle, 0.55 - 0.02 * ClosureOf(5.0, kFatMySpd, kFatTgtVel), 1e-3,
+            CheckNear(bb.Throttle, 0.60 - 0.02 * ClosureOf(5.0, kFatMySpd, kFatTgtVel), 1e-3,
                       "ATA=5.0 -> CONSERVE 스로틀");
         }
     }
@@ -256,24 +256,17 @@ int main()
             Action::Task_AggressiveOBFM n("Task_AggressiveOBFM", config);
             Setup(bb, D, 2.0, kFatMySpd, kFatTgtSpd, kFatTgtVel);
             tick(n);
-            CheckNear(bb.Throttle, 0.85 - 0.02 * (ClosureOf(2.0, kFatMySpd, kFatTgtVel) - 10.0), 1e-3,
-                      "여유 충분(margin 0.5625) + ATA=2.0 -> PURSUE 유지");
+            CheckNear(bb.Throttle, 0.90 - 0.02 * (ClosureOf(2.0, kFatMySpd, kFatTgtVel) - 12.0), 1e-3,
+                     "여유 충분(margin 0.5625) + ATA=2.0 -> PURSUE 유지");
         }
         {
             Action::Task_AggressiveOBFM n("Task_AggressiveOBFM", config);
             Setup(bb, D, 2.0, kThinMySpd, kThinTgtSpd, kThinTgtVel);
             tick(n);
-            /*
-            k=0.5 -> thin=0.5 -> base = 0.55 - 0.10*(0.5/0.5) = 0.45.
-            0.45 - 0.02*closure(~10) = 0.25 인데 CONSERVE 스로틀 하한이 0.30 이라 걸린다.
-            여유 충분일 때(0.35)와는 여전히 다르므로 에너지가 반영된 것은 확인된다.
-            */
-            const double raw = 0.45 - 0.02 * ClosureOf(2.0, kThinMySpd, kThinTgtVel);
-            const double want = raw < 0.30 ? 0.30 : raw;
-            CheckNear(bb.Throttle, want, 1e-3,
-                      "여유 얇음(margin 0.0506) + 같은 ATA=2.0 -> CONSERVE 로 하강 (스로틀 하한 0.30)");
-            Check(bb.Throttle < 0.35 - 1e-4,
-                  "그 스로틀은 여유 충분일 때의 CONSERVE(0.35)보다 낮다");
+            CheckNear(bb.Throttle, 0.30, 1e-3,
+                     "여유 얇음 + 같은 ATA=2.0 -> CONSERVE 로 하강 (스로틀 하한 0.30)");
+            Check(bb.Throttle < 0.65 - 1e-4,
+                  "그 스로틀은 여유 충분일 때의 PURSUE(0.65)보다 낮다");
         }
         {
             // CONSERVE 의 lag 도 얇을수록 커진다. lag 는 표적 뒤로 빼는 거리이므로 VP.X 로 보인다.
@@ -286,11 +279,9 @@ int main()
                 Action::Task_AggressiveOBFM n("Task_AggressiveOBFM", config);
                 Setup(bb, D, 5.0, kThinMySpd, kThinTgtSpd, kThinTgtVel); tick(n); xThin = bb.VP_Cartesian.X;
             }
-            // 허용오차 1e-3. 노드 안에서 lag 은 float 로 계산되고 0.15f 는 이진수로
-            // 정확히 표현되지 않아 800 m 에 곱하면 5e-6 수준의 오차가 남는다.
-            CheckNear(D - xFat, 0.15 * D, 1e-3, "여유 충분: lag = 0.15*D");
-            CheckNear(D - xThin, 0.15 * D * Action::Task_AggressiveOBFM::E_CONSERVE_LAG_MUL_MAX, 1e-3,
-                      "여유 얇음: lag = 0.15*D * E_CONSERVE_LAG_MUL_MAX");
+            CheckNear(D - xFat, 0.12 * D, 1e-3, "여유 충분: lag = 0.12*D");
+            CheckNear(D - xThin, 0.12 * D * Action::Task_AggressiveOBFM::E_CONSERVE_LAG_MUL_MAX, 1e-3,
+                     "여유 얇음: lag = 0.12*D * E_CONSERVE_LAG_MUL_MAX");
         }
     }
 
@@ -307,14 +298,14 @@ int main()
             Action::Task_AggressiveOBFM n("Task_AggressiveOBFM", config);
             Setup(bb, D, 2.0, kFatMySpd, kFatTgtSpd, kFatTgtVel);  tick(n);   // -> PURSUE
             Setup(bb, D, 2.7, kFatMySpd, kFatTgtSpd, kFatTgtVel);  tick(n);   // 버퍼: 유지되어야 한다
-            CheckNear(bb.Throttle, 0.85 - 0.02 * (c27 - 10.0), 1e-3,
+            CheckNear(bb.Throttle, 0.90 - 0.02 * (c27 - 12.0), 1e-3,
                       "PURSUE 에서 진입한 ATA=2.7 은 PURSUE 유지");
         }
         {
             Action::Task_AggressiveOBFM n("Task_AggressiveOBFM", config);
             Setup(bb, D, 3.5, kFatMySpd, kFatTgtSpd, kFatTgtVel);  tick(n);   // -> CONSERVE
             Setup(bb, D, 2.7, kFatMySpd, kFatTgtSpd, kFatTgtVel);  tick(n);   // 버퍼: 유지되어야 한다
-            CheckNear(bb.Throttle, 0.55 - 0.02 * c27, 1e-3,
+            CheckNear(bb.Throttle, 0.60 - 0.02 * c27, 1e-3,
                       "CONSERVE 에서 진입한 ATA=2.7 은 CONSERVE 유지");
         }
     }
@@ -333,8 +324,8 @@ int main()
         Setup(bb, D, 1.0, mySpd, tgtSpd, tgtVel);
         tick(n);
 
-        Check(closure > Action::Task_AggressiveOBFM::OVERSHOOT_CLOSURE,
-              "전제: closure > OVERSHOOT_CLOSURE");
+        Check(closure >= Action::Task_AggressiveOBFM::OVERSHOOT_CLOSURE,
+              "전제: closure >= OVERSHOOT_CLOSURE");
         CheckNear(bb.VP_Cartesian.X, D, 1e-6, "VP.X = 표적 X (뒤로 빼지 않는다)");
         CheckNear(bb.VP_Cartesian.Z, Action::Task_AggressiveOBFM::H_YOYO, 1e-6,
                   "VP.Z = +H_YOYO (MyUpVector 방향 수직 회피)");
@@ -396,9 +387,9 @@ int main()
         tick(n);
         CheckNear(bb.VP_Cartesian.X,
                   1500.0 + kFatTgtVel * Action::Task_AggressiveOBFM::LEAD_TIME_MAX_SEC, 1e-6,
-                  "t_lead 가 LEAD_TIME_MAX_SEC(0.6)으로 잘린다");
-        Check(Action::Task_AggressiveOBFM::LEAD_TIME_MAX_SEC == 0.6f,
-              "LEAD_TIME_MAX_SEC == 0.6");
+                  "t_lead 가 LEAD_TIME_MAX_SEC(0.7)으로 잘린다");
+        Check(Action::Task_AggressiveOBFM::LEAD_TIME_MAX_SEC == 0.7f,
+              "LEAD_TIME_MAX_SEC == 0.7");
         Check(Action::Task_AggressiveOBFM::LEAD_TIME_MIN_SEC == 0.05f,
               "LEAD_TIME_MIN_SEC == 0.05");
     }

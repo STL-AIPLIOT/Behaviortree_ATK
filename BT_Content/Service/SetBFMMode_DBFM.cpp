@@ -1,5 +1,6 @@
 #include "SetBFMMode_DBFM.h"
 #include "../BTLog.h"
+#include "../STIL_Tuning.h"
 #include <iostream>
 #include <algorithm>
 
@@ -28,9 +29,11 @@ BT::NodeStatus SetBFMMode_DBFM::tick()
     const int   energy_cmp = BB->EnergyCompareResult; // >0: 우세, 0: 동등, <0: 열세
 
     // === DBFM 진입 창 ===
-    // - 시야 확보
-    // - 거리: 너무 멀면(>1500) 진입X, 너무 가까우면(예: <200) 별도 방어 스텝 필요
-    const bool dist_ok = (D >= 200.0f && D <= 1500.0f);
+    // 방어는 예외 분기이며, 공격 루트가 우선되어야 한다. 근거리/정면 교전에서는
+    // 즉시 OBFM/HABFM 로 재전환되도록 진입 창을 좁힌다.
+    const bool dist_ok = (D >= 250.0f && D <= 1000.0f);
+    const bool los_ok = (los_deg >= 25.0f && los_deg <= 90.0f);
+    const bool defensive_geom = ((AA >= 120.0f && D >= 400.0f) || (energy_cmp < 0 && D <= 800.0f));
 
     /*
     [수정 2026-08-17] los_ok = (los_deg >= 15) 조건 삭제.
@@ -48,16 +51,16 @@ BT::NodeStatus SetBFMMode_DBFM::tick()
     거리·시야만 보고 진입하게 되돌린다. 반격 여부는 아래 geom_ok 가 따로 판단한다.
     */
 
-    if (sight && dist_ok)
+    if (sight && dist_ok && los_ok && defensive_geom)
     {
         BB->BFM = DBFM;
 
         // === 반격 모드 조건 ===
         // 에너지 우세 + (기하 창) : 너무 가깝지 않고(Anti-overshoot 위험), 각도 과대 아님
         //
-        // AA < 60 은 BB 규약(0 = 내가 적기 코앞)에서 "적기가 나를 향하고 있다" = 내가 방어
-        // 측이라는 뜻이므로, 롤 리버스 반격의 전제로 옳다. 여기는 손대지 않는다.
-        bool geom_ok = (D >= 350.0f && D <= 1000.0f) && (AA < 60.0f);
+        // AA >= 120° 는 적기가 6시 뒤에 있거나, 우리쪽으로 다가오지 않고 휘청거리는 상황이다.
+        // 이 상태에서만 방어 시나리오를 유지하고, 즉시 공격으로 재전환한다.
+        const bool geom_ok = (D >= 350.0f && D <= 1000.0f) && (AA >= 120.0f);
         BB->IsCounterAttack = (energy_cmp > 0) && geom_ok;
 
         BT_VLOG("[SetBFMMode_DBFM] t=" << BB->MatchTimeSec() << "s | Enter DBFM"
@@ -70,6 +73,9 @@ BT::NodeStatus SetBFMMode_DBFM::tick()
     // 진입 실패 사유 로그
     BT_VLOG("[SetBFMMode_DBFM] t=" << BB->MatchTimeSec() << "s | Blocked"
         << " | sight=" << sight
+        << ", dist_ok=" << dist_ok
+        << ", los_ok=" << los_ok
+        << ", defensive_geom=" << defensive_geom
         << ", D=" << D << ", LOSt=" << los_deg
         << ", AA=" << AA << "\n");
     return BT::NodeStatus::FAILURE;

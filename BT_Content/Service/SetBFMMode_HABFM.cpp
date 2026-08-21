@@ -176,8 +176,8 @@ BT::NodeStatus SetBFMMode_HABFM::tick()
     실험 2단계를 돌릴 수 있어야 하므로 다른 것을 건드리지 않는다.
     구식 복원: STIL_HABFM_DMIN=800
     */
-    const bool dist_ok = (D >= STIL::HabfmDMin() && D <= 2000.0);
-    const bool e_ok = (ec >= 0);
+    const bool dist_ok = (D >= STIL::HabfmDMin() && D <= 2100.0);
+    const bool e_ok = (ec >= -1);
 
     if (sight && aa_ok && dist_ok && e_ok)
     {

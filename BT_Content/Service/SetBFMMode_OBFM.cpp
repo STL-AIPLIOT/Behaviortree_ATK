@@ -79,15 +79,23 @@ namespace Action {  // ★ 추가
             return BT::NodeStatus::FAILURE;
         }
 
-        const bool dist_ok   = (D >= STIL::ObfmDMin() && D <= STIL::ObfmDMax());
-        const bool ata_ok    = (ATA <= STIL::ObfmAtaMax());
-        // 에너지 열세여도 근접이면 통과시킨다.
-        const bool energy_ok = (dE >= STIL::ObfmDeMin()) || (D <= STIL::ObfmDClose());
+        const bool dist_ok   = (D >= 120.0f && D <= 2000.0f);
+        const bool ata_ok    = (ATA <= 45.0f);
+        // 근접전은 에너지 열세라도 OBFM 진입을 허용해 거리 압축을 유지한다.
+        const bool energy_ok = (dE >= -350.0f) || (D <= 650.0f);
 
-        if (sight && dist_ok && ata_ok && energy_ok) {
+        // 공격형 보강: 200~1200m 구간에서 ATA 가 매우 좋고 시야가 잡히면
+        // OBFM 을 더 빨리 잡아 거리 압축과 사격 창을 만든다.
+        const bool close_in_push = sight &&
+            (D >= 200.0f && D <= 1200.0f) &&
+            (ATA <= 25.0f) &&
+            (BB->EnergyCompareResult >= -1 || D <= 700.0f);
+
+        if (sight && ((dist_ok && ata_ok && energy_ok) || close_in_push)) {
             BB->BFM = OBFM;
-            BT_VLOG("[SetBFMMode_OBFM] t=" << BB->MatchTimeSec() << "s | Enter OBFM (ATA=" << ATA
-                << ", D=" << D << ", dE=" << dE << ")\n");
+            BT_VLOG("[SetBFMMode_OBFM] t=" << BB->MatchTimeSec() << "s | Enter OBFM"
+                << " | ATA=" << ATA << ", D=" << D << ", dE=" << dE
+                << ", close_in_push=" << (close_in_push ? "YES" : "NO") << "\n");
             return BT::NodeStatus::SUCCESS;
         }
 
@@ -96,6 +104,7 @@ namespace Action {  // ★ 추가
             << ", dist_ok=" << dist_ok
             << ", ata_ok=" << ata_ok
             << ", energy_ok=" << energy_ok
+            << ", close_in_push=" << close_in_push
             << " | ATA=" << ATA << ", AA=" << AA << ", D=" << D << ", dE=" << dE << "\n");
         return BT::NodeStatus::FAILURE;
     }

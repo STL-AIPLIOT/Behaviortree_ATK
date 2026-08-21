@@ -71,8 +71,10 @@ CPPBlackBoard::CPPBlackBoard()
 	MyAngleAcceleration = Vector3(0, 0, 0);
 	AltSpeed = 0.0f;
 
-	EnemyInSight = false;
-	EnemyInSight_Target = false;
+	// 기본값은 교전 상태로 간주해 OBFM/DBFM 같은 게이트가 비활성화되지 않도록 한다.
+	// 실전 런타임에서 호스트가 이 값을 채우면 덮어쓴다.
+	EnemyInSight = true;
+	EnemyInSight_Target = true;
 
 	IsEnergySuperior = false;
 	IsEnergyInferior = false;

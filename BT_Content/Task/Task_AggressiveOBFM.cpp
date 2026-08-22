@@ -271,6 +271,10 @@ namespace Action
         // ---------------------------------------------------------------
         const bool overshoot_risk = (closure >= OVERSHOOT_CLOSURE) && (D < OVERSHOOT_D);
         const bool gun_commit = (D <= 650.0f) && (ata <= 2.5f) && (WezPhase::BestCoeff(match_t, ata, D) > 0.0f);
+        const bool finisher_window =
+            (D <= 500.0f) &&
+            (ata <= 8.0f) &&
+            ((BB->PredictedTurnDirection == "LEFT") || (BB->PredictedTurnDirection == "RIGHT") || (WezPhase::BestCoeff(match_t, ata, D) > 0.0f));
 
         if (overshoot_risk)
         {
@@ -301,8 +305,16 @@ namespace Action
             {
                 turn_dir = Normalized(local);
             }
-            vp = lead_point + turn_dir * static_cast<double>(TURN_IN_BIAS * 1.5);
-            thr = clampf(THR_ALLOUT_BASE, 0.85f, 1.0f);
+            if (finisher_window)
+            {
+                vp = lead_point + turn_dir * static_cast<double>(TURN_IN_BIAS * 1.9);
+                thr = clampf(THR_ALLOUT_BASE + 0.04f, 0.90f, 1.0f);
+            }
+            else
+            {
+                vp = lead_point + turn_dir * static_cast<double>(TURN_IN_BIAS * 1.5);
+                thr = clampf(THR_ALLOUT_BASE, 0.85f, 1.0f);
+            }
             mode = "ALL_OUT";
             prev_tier_ = TIER_ALL_OUT;
         }
@@ -407,6 +419,13 @@ namespace Action
                     if (band == E_HIGH) { lead_mul = 1.25f; }
                     else if (band == E_LOW) { lead_mul = 0.75f; thr_bias = 0.10f; }
                 }
+                const bool evasive_finisher = (D <= 600.0f) && (ata <= 10.0f)
+                    && ((BB->PredictedTurnDirection == "LEFT") || (BB->PredictedTurnDirection == "RIGHT"));
+                if (evasive_finisher)
+                {
+                    lead_mul = 1.5f;
+                    thr_bias = -0.05f;
+                }
 
                 Vector3 to_lead = (BB->TargetLocaion_Cartesian
                     + Vt * static_cast<double>(t_flight * PURSUE_LEAD_GAIN * lead_mul))
@@ -422,7 +441,8 @@ namespace Action
                         if (BB->PredictedTurnDirection == "RIGHT") { return  Normalized(BB->MyRightVector); }
                         return Normalized(perp);
                     }();
-                    vp = vp + turn_dir * static_cast<double>(TURN_IN_BIAS * lead_mul);
+                    const double finisher_bias = evasive_finisher ? (TURN_IN_BIAS * 1.8) : (TURN_IN_BIAS * lead_mul);
+                    vp = vp + turn_dir * finisher_bias;
                 }
                 thr = clampf(THR_PURSUE_BASE - thr_bias - THR_CLOSURE_GAIN * closure_err, 0.45f, 1.0f);
                 mode = "PURSUE";

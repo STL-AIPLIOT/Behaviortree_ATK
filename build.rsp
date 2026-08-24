@@ -1,0 +1,37 @@
+/nologo
+/std:c++17
+/EHsc
+/LD
+/DWIN32
+/D_WINDOWS
+/D_USRDLL
+/I"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK"
+/I"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\behaviortree_cpp_v3"
+/I"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\3rdparty"
+/Fe:"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\Behaviortree_ATK.dll"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\action_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\basic_types.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\behavior_tree.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\blackboard.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\bt_factory.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\condition_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\control_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\CPPBehaviorTree.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\decorator_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\shared_library_WIN.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\tinyxml2.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\tree_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\xml_parsing.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\controls\fallback_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\controls\parallel_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\controls\reactive_fallback.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\controls\reactive_sequence.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\controls\sequence_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\controls\sequence_star_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\controls\switch_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\decorators\inverter_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\decorators\repeat_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\decorators\retry_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\decorators\subtree_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\decorators\timeout_node.cpp"
+"C:\Users\???\OneDrive\?? ??\TOPGUN_STIL\Behaviortree_ATK\Behaviortree_ATK\BT_Content\Functions.cpp"

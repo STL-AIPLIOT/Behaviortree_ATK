@@ -239,7 +239,7 @@ void UCPPBehaviorTree::init()
 	[수정 2026-08-17] 주최측 2026-05-26 패치 대응 — init() 전체를 try-catch 로 감싼다.
 
 	패치된 LibMain.cpp::CreateBehaviorTree 는 init() 을 부른 뒤 IsInitialized() 가 true 일
-	때만 BTList 에 등록한다. XML 이름 오타 하나로 createTreeFromFile 이 던지면 예전에는
+	때만 BTList 에 등록한다. xml 이름 오타 하나로 createTreeFromFile 이 던지면 예전에는
 	ctypes 경계를 넘어 OSError: [WinError -529697949] 라는 정체불명 메시지만 남았다.
 	여기서 원인을 사람이 읽을 수 있는 형태로 찍고 다시 던진다.
 
@@ -256,36 +256,36 @@ void UCPPBehaviorTree::init()
 
 	//파일로 트리 구조 정의
 	//
-	// 파일명을 하드코딩하지 않는다. 환경변수 BT_RULE_XML 이 있으면 그 경로를 쓰고,
+	// 파일명을 하드코딩하지 않는다. 환경변수 BT_RULE_xml 이 있으면 그 경로를 쓰고,
 	// 없으면 팀 고유 이름인 "./Rule_STIL_ATK.xml" 이다.
 	//
 	// [수정 2026-08-17] 기본값 "./Rule.xml" -> "./Rule_STIL_ATK.xml".
-	// 규정 §9 제출물이 "코드·모델·XML"이고, Release 루트에는 벤더 DLL 이 읽는 XML 과
-	// 우리 XML 이 함께 놓인다. 일반명 Rule.xml 을 쓰면 벤더 AIP_BASE_target.dll 이
-	// 우리 XML 을 집어 자기 노드를 못 찾고 죽는다(아래 1번과 같은 사고).
-	// DLL 과 XML 은 한 세트이므로 이름도 함께 버전을 맞춘다.
+	// 규정 §9 제출물이 "코드·모델·xml"이고, Release 루트에는 벤더 DLL 이 읽는 xml 과
+	// 우리 xml 이 함께 놓인다. 일반명 Rule.xml 을 쓰면 벤더 AIP_BASE_target.dll 이
+	// 우리 xml 을 집어 자기 노드를 못 찾고 죽는다(아래 1번과 같은 사고).
+	// DLL 과 xml 은 한 세트이므로 이름도 함께 버전을 맞춘다.
 	//
 	// 왜 필요했나 — 하드코딩 하나가 세 가지를 동시에 막고 있었다:
-	//   1) Release 루트에 Rule.xml 을 하나만 둘 수 있어, 팀 XML 을 놓으면
+	//   1) Release 루트에 Rule.xml 을 하나만 둘 수 있어, 팀 xml 을 놓으면
 	//      벤더 AIP_BASE_target.dll 이 자기 노드를 못 찾고 C++ 예외로 죽었다
 	//      (ctypes 경계를 넘으면 OSError: [WinError -529697949] 로만 보인다).
 	//   2) 제출용으로 Rule_<team>.xml 로 바꿀 수 없었다.
-	//   3) XML 을 골라 쓰는 구조가 성립하지 않았다.
+	//   3) xml 을 골라 쓰는 구조가 성립하지 않았다.
 	//
 	// export 를 늘리지 않고 환경변수로 연 이유: native_bt.py 가 바인딩하는 export 는
 	// 6종(CreateBehaviorTree/ChangeData/Step/GetVP/Reset/RemoveBT)으로 고정이고,
 	// 여기에 추가하면 호스트 쪽 수정이 필요해진다(수정 금지 영역).
 	// 상대경로는 CWD 기준이다 — 실행 디렉터리가 Release 루트여야 한다.
 	rulePath = "./Rule_STIL_ATK.xml";
-	if (const char* envPath = std::getenv("BT_RULE_XML"))
+	if (const char* envPath = std::getenv("BT_RULE_xml"))
 	{
 		if (envPath[0] != '\0') { rulePath = envPath; }
 	}
 	if (BtDiagEnabled())
 	{
 		/*
-		[A/계측 2026-08-19] 경로만으로는 "어느 XML 이 실제로 읽혔는가" 를 못 가린다.
-		v3p 에서 우리 XML(8,404 B) 대신 5,947 B 짜리 옛 파일이 읽힌 사고가 있었는데,
+		[A/계측 2026-08-19] 경로만으로는 "어느 xml 이 실제로 읽혔는가" 를 못 가린다.
+		v3p 에서 우리 xml(8,404 B) 대신 5,947 B 짜리 옛 파일이 읽힌 사고가 있었는데,
 		경로 문자열은 정상으로 보였다. 같은 이름의 다른 파일이었기 때문이다.
 		크기를 함께 남겨 파일 동일성을 바로 판별한다.
 		*/
@@ -341,9 +341,9 @@ void UCPPBehaviorTree::init()
 	}
 	
 	//문자열로 트리 구조 정의
-	//std::string XML = StrCat(xml_text1, xml_text2);
-	////std::cout << XML << std::endl;
-	//tree = Factory.createTreeFromText(XML);
+	//std::string xml = StrCat(xml_text1, xml_text2);
+	////std::cout << xml << std::endl;
+	//tree = Factory.createTreeFromText(xml);
 
 	//블랙보드 연결 : 원래는 블랙보드 내에 있는 모든 변수를 하나하나 이런식으로 입력해줘야하는 미친 비효율을 보이는 방식이지만 커스텀 블랙보드를 만들어 해당 블랙보드를 입력시킴
 	tree.rootBlackboard()->set<CPPBlackBoard*>("BB", BB);
@@ -357,10 +357,10 @@ void UCPPBehaviorTree::init()
 		bInitialized = false;
 
 		std::cout << "Behavior Tree Initialization Failed: " << e.what() << std::endl;
-		std::cout << "  rule xml = " << rulePath << " (override: BT_RULE_XML)" << std::endl;
-		std::cout << "It appears that the process failed while parsing the XML." << std::endl;
-		std::cout << " -Please check whether the XML file is located in the correct path." << std::endl;
-		std::cout << " -Please check whether the XML file is calling any node with an invalid or incorrect name." << std::endl;
+		std::cout << "  rule xml = " << rulePath << " (override: BT_RULE_xml)" << std::endl;
+		std::cout << "It appears that the process failed while parsing the xml." << std::endl;
+		std::cout << " -Please check whether the xml file is located in the correct path." << std::endl;
+		std::cout << " -Please check whether the xml file is calling any node with an invalid or incorrect name." << std::endl;
 		std::cout << " -Please check whether the node was added to the Factory when building the DLL." << std::endl;
 
 		if (BtDiagEnabled()) { BtDiag(std::string("[init] FAILED: ") + e.what() + " rule=" + rulePath); }
